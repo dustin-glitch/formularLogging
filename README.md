@@ -6,13 +6,15 @@ Besonders geeignet für Fehleranalysen bei YOOtheme Pro Form-Elementen, YOOessen
 
 ## ✨ Features
 
-- **🚀 Native YOOtheme & YOOessentials Integration:** Erkennt Javascript-Events von UIkit und protokolliert Formulareinsendungen direkt an der Quelle.
+- **🚀 Native YOOtheme & YOOessentials Integration:** Erkennt Javascript-Events von UIkit und protokolliert Formulareinsendungen sowie Honeypot-Validierungsfehler direkt an der Quelle.
 - **🛡️ 100% DSGVO / GDPR-Konform:**
+  - **AES-256 Verschlüsselung**: Sensible JSON-Payloads (Benutzereingaben) werden vor dem Speichern mit einer 256-Bit starken AES-Verschlüsselung (`Crypto`) encodiert. Nur das Dashboard entschlüsselt on-the-fly.
   - **IP-Anonymisierung**: Die letzte Stelle der IP-Adresse des Users wird maskiert (`192.168.1.*`), bevor sie im Log landet.
   - **Verzeichnis-Absicherung**: Logs werden in `.csv`-Dateien geschrieben, die strikt durch dynamische `.htaccess`- und `index.php`-Sicherungen vor öffentlichem Zugriff geschützt sind.
   - **Konfigurierbare Speicherdauer**: Logs werden nach einer einstellbaren Dauer (Standard: 30 Tage) vollautomatisch vom Server gelöscht.
 - **✉️ WP Mail SMTP Support:** Fängt tiefe Fehler im Mail-Prozess ab, lange bevor WordPress sie bemerkt. Ideal für das Debugging von SMTP-, Login- oder Connection-Timeouts.
 - **📊 Modernes Admin-Interface:** 
+  - **Dashboard Widget**: Praktische Zusammenfassung der täglichen Anfragen und Fehler auf dem WordPress-Dashboard.
   - Eine elegante, übersichtliche Log-Tabelle im Backend (im exklusiven Signalfeuer-Design).
   - Gruppierung von Logs nach `Request ID` für einfache Nachverfolgung (Vom Formular-Submit bis zum E-Mail-Fehler in einem Block).
   - Dynamisches Ausblenden leerer Spalten.
