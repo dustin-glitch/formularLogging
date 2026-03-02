@@ -413,15 +413,58 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             $stage = isset($row['event_stage']) ? (string)$row['event_stage'] : '';
             $type = isset($row['event_type']) ? (string)$row['event_type'] : '';
 
+            $extra = isset($row['extra_json']) ? (string)$row['extra_json'] : '';
+            $extraDecoded = $extra !== '' ? @json_decode($extra, true) : null;
+
             if ($type === 'frontend_js_error') {
                 return '<span class="sf-badge sf-badge-error">JS Fehler</span>';
             }
-            if ($stage === 'form_validation_failed' || $stage === 'form_field_invalid') {
-                return '<span class="sf-badge sf-badge-warning">Nutzer/Validierungsfehler</span>';
+
+            // Check Extra JSON for Captchas & Validation Details
+            $is_captcha = false;
+            $has_validation_errors = false;
+
+            $captcha_keywords = array('recaptcha', 'hcaptcha', 'turnstile', 'frcaptcha', 'friendly', 'honeypot');
+
+            if (is_array($extraDecoded)) {
+                // Check direct field
+                if (isset($extraDecoded['field'])) {
+                    $has_validation_errors = true;
+                    foreach ($captcha_keywords as $ck) {
+                        if (stripos((string)$extraDecoded['field'], $ck) !== false) {
+                            $is_captcha = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Check nested validation object (e.g. YOOtheme)
+                if (isset($extraDecoded['validation']) && is_array($extraDecoded['validation']) && !empty($extraDecoded['validation'])) {
+                    $has_validation_errors = true;
+                    foreach (array_keys($extraDecoded['validation']) as $v_key) {
+                        foreach ($captcha_keywords as $ck) {
+                            if (stripos((string)$v_key, $ck) !== false) {
+                                $is_captcha = true;
+                                break 2;
+                            }
+                        }
+                    }
+                }
             }
-            if ($status === 'error' || $status === 'failed' || $stage === 'wp_mail_failed') {
+
+            // Categorize
+            if ($is_captcha) {
+                return '<span class="sf-badge" style="background-color:#ffd54f; color:#3e2723; border: 1px solid #ffca28;">Spamschutz / Captcha</span>';
+            }
+
+            if ($stage === 'form_validation_failed' || $stage === 'form_field_invalid' || $has_validation_errors || ($stage === 'form_submission_error' && $status === 'failed')) {
+                return '<span class="sf-badge sf-badge-warning">Nutzer/Validierung</span>';
+            }
+
+            if ($status === 'error' || $status === 'failed' || $stage === 'wp_mail_failed' || $stage === 'form_submission_error') {
                 return '<span class="sf-badge sf-badge-error">System-/Mailerfehler</span>';
             }
+
             if ($status === 'info' || $status === 'success' || $status === 'started') {
                 return '<span class="sf-badge sf-badge-success">Erfolgreich / Info</span>';
             }
