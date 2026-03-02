@@ -57,8 +57,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 self::SETTINGS_GROUP,
                 'fl_retention_days',
                 array(
-                'type' => 'integer',
-                'sanitize_callback' => 'absint',
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_retention_days'),
                 'default' => 30,
             )
             );
@@ -121,12 +121,12 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
         public function render_retention_field()
         {
             $value = get_option('fl_retention_days', 30);
-            if ($value < 1) {
+            if ($value <= 0) {
                 $value = 7;
             }
 
-            echo '<input type="number" name="fl_retention_days" value="' . esc_attr((string)$value) . '" class="small-text" style="width: 80px;" min="1" step="1" />';
-            echo '<p class="description">Wie viele Tage sollen die Log-CSV-Dateien auf dem Server gespeichert bleiben bevor sie gelöscht werden?</p>';
+            echo '<input type="number" name="fl_retention_days" value="' . esc_attr((string)$value) . '" class="small-text" style="width: 80px;" min="0.001" step="any" />';
+            echo '<p class="description">Wie viele Tage sollen die Log-CSV-Dateien auf dem Server gespeichert bleiben bevor sie gelöscht werden? (Zum Testen sind auch Kommazahlen wie 0.001 erlaubt).</p>';
         }
 
         public function render_empty_pages_notice()
@@ -187,6 +187,12 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
             }
 
             return implode(PHP_EOL, array_values($clean));
+        }
+
+        public function sanitize_retention_days($value)
+        {
+            $value = str_replace(',', '.', (string)$value);
+            return floatval($value);
         }
 
         public function get_normalized_form_paths()
