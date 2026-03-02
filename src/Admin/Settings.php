@@ -63,6 +63,16 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
             )
             );
 
+            register_setting(
+                self::SETTINGS_GROUP,
+                'fl_github_update_token',
+                array(
+                'type' => 'string',
+                'sanitize_callback' => 'sanitize_text_field',
+                'default' => '',
+            )
+            );
+
             add_settings_section(
                 'fl_pages_section',
                 'Frontend Logging Seiten',
@@ -82,6 +92,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 'fl_retention_days',
                 'Speicherdauer (in Tagen)',
                 array($this, 'render_retention_field'),
+                self::PAGE_SLUG,
+                'fl_pages_section'
+            );
+
+            add_settings_field(
+                'fl_github_update_token',
+                'GitHub Access Token (für Updates)',
+                array($this, 'render_github_token_field'),
                 self::PAGE_SLUG,
                 'fl_pages_section'
             );
@@ -127,6 +145,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
 
             echo '<input type="number" name="fl_retention_days" value="' . esc_attr((string)$value) . '" class="small-text" style="width: 80px;" min="0.001" step="any" />';
             echo '<p class="description">Wie viele Tage sollen die Log-CSV-Dateien auf dem Server gespeichert bleiben bevor sie gelöscht werden? (Zum Testen sind auch Kommazahlen wie 0.001 erlaubt).</p>';
+        }
+
+        public function render_github_token_field()
+        {
+            $value = (string)get_option('fl_github_update_token', '');
+
+            echo '<input type="password" name="fl_github_update_token" value="' . esc_attr($value) . '" class="regular-text" />';
+            echo '<p class="description">Falls dieses Plugin in einem privaten GitHub Repository liegt, füge hier deinen <a href="https://github.com/settings/tokens" target="_blank">Personal Access Token (classic)</a> mit dem <code>repo</code> Scope ein, damit automatische Updates installiert werden können.</p>';
         }
 
         public function render_empty_pages_notice()

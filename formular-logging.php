@@ -49,7 +49,26 @@ register_activation_hook(__FILE__, 'fl_formular_logging_activate');
 register_deactivation_hook(__FILE__, 'fl_formular_logging_deactivate');
 
 require_once FL_FORMULAR_LOGGING_PLUGIN_DIR . 'autoloader.php';
+require_once FL_FORMULAR_LOGGING_PLUGIN_DIR . 'plugin-update-checker-5.6/plugin-update-checker.php';
 
 use Signalfeuer\FormularLogs\Core\Plugin;
+use YahnisElsts\PluginUpdateChecker\v5\PucFactory;
 
 Plugin::instance();
+
+// -----------------------------------------------------------------------------
+// Update Checker Configuration
+// -----------------------------------------------------------------------------
+$fl_github_token = trim(get_option('fl_github_update_token', ''));
+
+$flUpdateChecker = PucFactory::buildUpdateChecker(
+    'https://github.com/dustin-glitch/formularLogging',
+    __FILE__,
+    'formular-logging'
+);
+
+$flUpdateChecker->setBranch('main');
+
+if (!empty($fl_github_token)) {
+    $flUpdateChecker->setAuthentication($fl_github_token);
+}
