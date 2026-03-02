@@ -34,6 +34,21 @@ Unter `Formular Logs -> Einstellungen` können detaillierte Konfigurationen für
 - **Speicherdauer (in Tagen)**: Definiert, wie viele Tage die sicher hinterlegten CSV-Log-Dateien auf dem Server verweilen, bevor ein Cronjob diese restlos und DSGVO-konform vernichtet. 
 - **GitHub Access Token (für Updates)**: Wenn dieses Repository privat geschaltet ist, kann hier ein Token hinterlegt werden, um nahtlose, automatische WordPress-Updates im Hintergrund zu erlauben.
 
+## 🛠 Setup & Integration (Schritt-für-Schritt)
+
+Sobald das Plugin installiert ist, musst du es für deine Formularseiten scharf schalten.
+
+1. **Seiten registrieren**: Gehe zu **Formular Logs -> Einstellungen** und trage in das Textfeld die URLs ein, auf denen sich deine Formulare befinden. 
+   - Beispiele: `/kontakt`, `/jetzt-bewerben` oder `https://meine-domain.de/support`.
+   - Das Plugin lädt seine (super-leichten) Erkennungsskripte *nur* auf diesen spezifischen Seiten, um die WordPress-Performance anderswo nicht zu beeinträchtigen.
+2. **Formulare abschicken**: Konfiguriere dein Formular (z.B. in YOOtheme Pro) wie gewohnt. 
+   - Sobald ein Nutzer das Formular absendet, schaltet sich die Javascript-Logik (oder beim Senden die WP Mail SMTP Hook-Logik) dieses Plugins dazwischen.
+   - Alle Submit-Events, Feld-Validierungsfehler und Antworten vom Server werden automatisch über APIs geloggt.
+3. **Logs prüfen**: Sende ein Test-Formular ab. Navigiere anschließend zu **Formular Logs -> Alle Logs**.
+   - Du siehst nun den neuen Block ("Request ID") für deine Test-Anfrage.
+   - Wenn auf der Frontend-Seite z.B. das FriendlyCaptcha fehlschlägt, wird der Backend-Log dir sofort ein präzises gelbes Warn-Badge ("Spamschutz") anzeigen.
+   - Mit einem Klick auf **JSON ansehen** kannst du jederzeit den Inhalt deines Test-Requests (entschlüsselt) betrachten.
+
 ## 👨‍💻 Entwicklerhinweise
 
 Das Plugin ist Namespace-strukturiert (`Signalfeuer\FormularLogs\*`) und nutzt einen internen SPL-Autoloader beim Einbinden der `src/`-Ordnerklassen:
