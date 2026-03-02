@@ -120,7 +120,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 'manage_options',
                 'formular-logs',
                 array($this, 'render_admin_page'),
-                'dashicons-list-view',
+                FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/images/logomark-signalfeuer-black.svg',
                 30
             );
 
