@@ -13,10 +13,84 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
         /** @var LogStorage */
         private $storage;
 
-        public function __construct(LogStorage $storage)
+        /** @var \Signalfeuer\FormularLogs\Core\Crypto */
+        private $crypto;
+
+        public function __construct(LogStorage $storage, \Signalfeuer\FormularLogs\Core\Crypto $crypto)
         {
             $this->storage = $storage;
+            $this->crypto = $crypto;
             add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
+            add_action('wp_dashboard_setup', array($this, 'register_dashboard_widget'));
+        }
+
+        public function register_dashboard_widget()
+        {
+            if (!current_user_can('manage_options')) {
+                return;
+            }
+
+            wp_add_dashboard_widget(
+                'fl_dashboard_widget',
+                'Formular Logs: Übersicht',
+                array($this, 'render_dashboard_widget')
+            );
+        }
+
+        public function render_dashboard_widget()
+        {
+            $date = wp_date('Y-m-d');
+            $path = $this->storage->get_daily_log_path($date);
+            $rows = $this->storage->read_filtered_rows($path, array(), 1000);
+
+            $grouped = array();
+            foreach ($rows as $row) {
+                $req_id = isset($row['request_id']) ? $row['request_id'] : '';
+                if ($req_id === '') {
+                    $req_id = 'unknown_' . md5(wp_json_encode($row));
+                }
+                if (!isset($grouped[$req_id])) {
+                    $grouped[$req_id] = array();
+                }
+                $grouped[$req_id][] = $row;
+            }
+
+            $total = count($grouped);
+            $success = 0;
+            $errors = 0;
+
+            foreach ($grouped as $group_rows) {
+                $has_error = false;
+                $has_success = false;
+                foreach ($group_rows as $row) {
+                    $badgeHtml = $this->classify_problem($row);
+                    if (stripos($badgeHtml, 'fehler') !== false) {
+                        $has_error = true;
+                    }
+                    elseif (stripos($badgeHtml, 'erfolgreich') !== false) {
+                        $has_success = true;
+                    }
+                }
+
+                if ($has_error) {
+                    $errors++;
+                }
+                elseif ($has_success) {
+                    $success++;
+                }
+            }
+
+            echo '<div style="background:#f6f7f7; padding:15px; border-radius:4px; text-align:center; border:1px solid #ccd0d4;">';
+            echo '<h3 style="margin-top:0; color:#1d2327;">Heute (' . esc_html($date) . ')</h3>';
+            echo '<p style="font-size:24px; font-weight:bold; margin:10px 0; color:#1d2327;">' . esc_html((string)$total) . ' <span style="font-size:14px; font-weight:normal; color:#646970;">Anfragen</span></p>';
+            echo '<div style="display:flex; justify-content:space-around; margin-top:15px; padding-top:15px; border-top:1px solid #ccd0d4;">';
+            echo '  <div style="flex:1;"><strong style="color:#00a32a; font-size:18px;">' . esc_html((string)$success) . '</strong><br><span style="color:#646970; font-size:12px;">Erfolgreich</span></div>';
+            echo '  <div style="flex:1;"><strong style="color:#d63638; font-size:18px;">' . esc_html((string)$errors) . '</strong><br><span style="color:#646970; font-size:12px;">Fehler</span></div>';
+            echo '</div>';
+            echo '<div style="margin-top:20px;">';
+            echo '  <a href="' . esc_url(admin_url('admin.php?page=formular-logs')) . '" class="button button-primary" style="background:#F26B22; border-color:#F26B22;">Zu den Logs</a>';
+            echo '</div>';
+            echo '</div>';
         }
 
         public function enqueue_admin_assets($hook_suffix)
@@ -27,6 +101,13 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                     FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/css/admin.css',
                     array(),
                     file_exists(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') ? filemtime(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') : FL_FORMULAR_LOGGING_VERSION
+                );
+                wp_enqueue_script(
+                    'fl-admin-script',
+                    FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/js/admin.js',
+                    array(),
+                    file_exists(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/js/admin.js') ? filemtime(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/js/admin.js') : FL_FORMULAR_LOGGING_VERSION,
+                    true
                 );
             }
         }
@@ -61,8 +142,20 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
             $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : '';
             $download = isset($_GET['fl_download']) ? sanitize_text_field(wp_unslash($_GET['fl_download'])) : '';
+            $cleanup = isset($_GET['fl_cleanup']) ? sanitize_text_field(wp_unslash($_GET['fl_cleanup'])) : '';
 
-            if ($page !== 'formular-logs' || $download !== '1') {
+            if ($page !== 'formular-logs') {
+                return;
+            }
+
+            if ($cleanup === '1') {
+                check_admin_referer('fl_manual_cleanup');
+                \Signalfeuer\FormularLogs\Core\Plugin::instance()->run_cleanup();
+                wp_safe_redirect(admin_url('admin.php?page=formular-logs&fl_message=cleanup_done'));
+                exit;
+            }
+
+            if ($download !== '1') {
                 return;
             }
 
@@ -95,6 +188,11 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             $page = isset($_GET['page']) ? sanitize_text_field(wp_unslash($_GET['page'])) : '';
             if ($page !== 'formular-logs') {
                 return;
+            }
+
+            $message = isset($_GET['fl_message']) ? sanitize_text_field(wp_unslash($_GET['fl_message'])) : '';
+            if ($message === 'cleanup_done') {
+                echo '<div class="notice notice-success is-dismissible"><p>Formular Logging: Veraltete Log-Dateien wurden gemäß Speicherdauer-Regel erfolgreich gelöscht.</p></div>';
             }
 
             $log_dir = $this->storage->get_log_dir();
@@ -172,9 +270,21 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             echo '<input type="text" id="fl-status" name="status" value="' . esc_attr($status) . '" /></div>';
             echo '<div><label for="fl-event-type">Event Type: </label>';
             echo '<input type="text" id="fl-event-type" name="event_type" value="' . esc_attr($event_type) . '" /></div>';
+            $cleanup_url = wp_nonce_url(
+                add_query_arg(
+                array(
+                'page' => 'formular-logs',
+                'fl_cleanup' => '1',
+            ),
+                admin_url('admin.php')
+            ),
+                'fl_manual_cleanup'
+            );
+
             echo '<div>';
             submit_button('Filter anwenden', '', '', false, array('class' => 'sf-btn-primary'));
             echo ' <a class="sf-btn-secondary" href="' . esc_url($download_url) . '">CSV herunterladen</a>';
+            echo ' <a class="sf-btn-secondary" href="' . esc_url($cleanup_url) . '" onclick="return confirm(\'Veraltete Logs (gemäß Einstellung) jetzt unwiderruflich löschen?\');">Logs bereinigen</a>';
             echo '</div>';
             echo '</form>';
 
@@ -263,7 +373,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                             $value = isset($row[$column]) ? (string)$row[$column] : '';
 
                             if ($value !== '' && in_array($column, array('payload_json', 'attachments_json', 'extra_json'), true)) {
-                                echo '<td style="max-width:300px;"><button type="button" class="sf-btn-secondary fl-view-json" data-json="' . esc_attr($value) . '">JSON ansehen</button></td>';
+                                $decrypted = ($column === 'payload_json') ? $this->crypto->decrypt($value) : $value;
+                                echo '<td style="max-width:300px;"><button type="button" class="sf-btn-secondary fl-view-json" data-json="' . esc_attr($decrypted) . '">JSON ansehen</button></td>';
                             }
                             else {
                                 echo '<td style="max-width:300px;word-break:break-word;">' . esc_html($value) . '</td>';
@@ -286,35 +397,6 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
         <pre><code id="fl-modal-content"></code></pre>
     </div>
 </div>
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        var modal = document.getElementById('fl-json-modal');
-        var closeBtn = document.getElementById('fl-modal-close');
-        var content = document.getElementById('fl-modal-content');
-
-        document.querySelectorAll('.fl-view-json').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var rawJson = this.getAttribute('data-json');
-                var formatted = rawJson;
-                try {
-                    formatted = JSON.stringify(JSON.parse(rawJson), null, 4);
-                } catch (err) {}
-                content.textContent = formatted;
-                modal.style.display = 'block';
-            });
-        });
-
-        closeBtn.addEventListener('click', function () {
-            modal.style.display = 'none';
-        });
-
-        window.addEventListener('click', function (event) {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        });
-    });
-</script>
 <?php
 
             echo '</div>';
