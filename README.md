@@ -49,6 +49,21 @@ Sobald das Plugin installiert ist, musst du es für deine Formularseiten scharf 
    - Wenn auf der Frontend-Seite z.B. das FriendlyCaptcha fehlschlägt, wird der Backend-Log dir sofort ein präzises gelbes Warn-Badge ("Spamschutz") anzeigen.
    - Mit einem Klick auf **JSON ansehen** kannst du jederzeit den Inhalt deines Test-Requests (entschlüsselt) betrachten.
 
+## 🔒 Sicherheit & .htaccess
+
+Da die geloggten Formulardaten in CSV-Dateien gespeichert werden, greifen strenge Sicherheitsmechanismen:
+
+- **Apache Server:** Das Plugin kümmert sich um alles selbst! Sobald das Verzeichnis `wp-content/uploads/form-logs/` erstellt wird, wird automatisch eine restriktive `.htaccess`-Datei (`Deny from all`) und eine `index.php` erzeugt. Dadurch ist direkter Dateizugriff von außen unmöglich.
+- **Nginx Server:** Da Nginx `.htaccess`-Dateien naturgemäß ignoriert, **musst** du folgenden Block in deine Nginx Server-Konfiguration (`server { ... }`) oder Plesk-Zusatzrichtlinien eintragen:
+
+```nginx
+# Formular Logging Plugin: Schutz des Log-Verzeichnisses
+location ^~ /wp-content/uploads/form-logs/ {
+    deny all;
+    return 403;
+}
+```
+
 ## 👨‍💻 Entwicklerhinweise
 
 Das Plugin ist Namespace-strukturiert (`Signalfeuer\FormularLogs\*`) und nutzt einen internen SPL-Autoloader beim Einbinden der `src/`-Ordnerklassen:
