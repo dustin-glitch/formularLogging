@@ -13,13 +13,12 @@ Besonders geeignet für Fehleranalysen bei YOOtheme Pro Form-Elementen, YOOessen
   - **Verzeichnis-Absicherung**: Logs werden in `.csv`-Dateien geschrieben, die strikt durch dynamische `.htaccess`- und `index.php`-Sicherungen vor öffentlichem Zugriff geschützt sind.
   - **Konfigurierbare Speicherdauer**: Logs werden nach einer einstellbaren Dauer (Standard: 30 Tage) vollautomatisch vom Server gelöscht.
 - **✉️ WP Mail SMTP Support:** Fängt tiefe Fehler im Mail-Prozess ab, lange bevor WordPress sie bemerkt. Ideal für das Debugging von SMTP-, Login- oder Connection-Timeouts.
-- **📊 Modernes Admin-Interface:** 
-  - **Dashboard Widget**: Praktische Zusammenfassung der täglichen Anfragen und Fehler auf dem WordPress-Dashboard.
-  - Eine elegante, übersichtliche Log-Tabelle im Backend (im exklusiven Signalfeuer-Design).
-  - Gruppierung von Logs nach `Request ID` für einfache Nachverfolgung (Vom Formular-Submit bis zum E-Mail-Fehler in einem Block).
-  - Dynamisches Ausblenden leerer Spalten.
-  - **JSON-Modal**: Erlaubt das bequeme Analysieren detaillierter Daten-Payloads auf Knopfdruck, ohne die Tabellen-Ansicht zu sprengen.
-  - Problem-Klassifizierungs-Badges.
+- **📊 Modernes Admin-Interface & Signalfeuer Brand:** 
+  - **Dashboard Widget**: Verpasse keine Fehler! Das Widget fasst die Logs des Tages direkt auf deinem WordPress-Start-Dashboard zusammen.
+  - Elegante, übersichtliche Log-Tabelle im Backend im wunderschönen **Signalfeuer** Design.
+  - **Detaillierte Fehlerklassifizierung:** Badges markieren Probleme exakt (z.B. "Spamschutz (hCaptcha)", "Nutzer/Validierung (email_field)" oder "Systemfehler").
+  - **JSON-Modal**: Erlaubt das bequeme Analysieren detaillierter (und on-the-fly entschlüsselter) Daten-Payloads auf Knopfdruck.
+- **🔄 Automatischer Update Checker (PUC):** Das Plugin aktualisiert sich direkt über unser GitHub-Repository. Bei privaten Repositories kann ganz einfach ein Access-Token in den Einstellungen hinterlegt werden.
 
 ## 📦 Installation
 
@@ -33,6 +32,7 @@ Besonders geeignet für Fehleranalysen bei YOOtheme Pro Form-Elementen, YOOessen
 Unter `Formular Logs -> Einstellungen` können detaillierte Konfigurationen für die Formulare vorgenommen werden:
 - **Formularseiten**: Liste alle URLs oder Slugs auf (eine Zeile pro URL), auf denen die Formular-Überwachungslogik greifen soll.
 - **Speicherdauer (in Tagen)**: Definiert, wie viele Tage die sicher hinterlegten CSV-Log-Dateien auf dem Server verweilen, bevor ein Cronjob diese restlos und DSGVO-konform vernichtet. 
+- **GitHub Access Token (für Updates)**: Wenn dieses Repository privat geschaltet ist, kann hier ein Token hinterlegt werden, um nahtlose, automatische WordPress-Updates im Hintergrund zu erlauben.
 
 ## 👨‍💻 Entwicklerhinweise
 
