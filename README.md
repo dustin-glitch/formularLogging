@@ -31,7 +31,8 @@ Besonders geeignet für Fehleranalysen bei YOOtheme Pro Form-Elementen, YOOessen
 
 Unter `Formular Logs -> Einstellungen` können detaillierte Konfigurationen für die Formulare vorgenommen werden:
 - **Formularseiten**: Liste alle URLs oder Slugs auf (eine Zeile pro URL), auf denen die Formular-Überwachungslogik greifen soll.
-- **Speicherdauer (in Tagen)**: Definiert, wie viele Tage die sicher hinterlegten CSV-Log-Dateien auf dem Server verweilen, bevor ein Cronjob diese restlos und DSGVO-konform vernichtet. 
+- **Speicherdauer (in Tagen)**: Definiert, wie viele Tage die sicher hinterlegten CSV-Log-Dateien auf dem Server verweilen, bevor ein Cronjob diese restlos und DSGVO-konform vernichtet.
+- **Dateipfad für Logs (Absolut)**: Erlaubt es, den standardmäßigen Speicherort (`wp-content/uploads/form-logs/`) mit einem absoluten Server-Pfad zu überschreiben (z.B. `/var/www/virtual/user/logs/`). Sehr nützlich für Server wie Mittwald mit speziellen Nginx/Ordner-Restriktionen.
 - **GitHub Access Token (für Updates)**: Wenn dieses Repository privat geschaltet ist, kann hier ein Token hinterlegt werden, um nahtlose, automatische WordPress-Updates im Hintergrund zu erlauben.
 
 ## 🛠 Setup & Integration (Schritt-für-Schritt)

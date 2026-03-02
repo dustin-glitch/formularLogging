@@ -53,6 +53,11 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
 
         public function get_log_dir()
         {
+            $custom_dir = trim((string)get_option('fl_custom_log_dir', ''));
+            if (!empty($custom_dir)) {
+                return trailingslashit($custom_dir);
+            }
+
             $uploads = wp_get_upload_dir();
             $base = isset($uploads['basedir']) ? $uploads['basedir'] : WP_CONTENT_DIR . '/uploads';
             return trailingslashit($base) . 'form-logs';

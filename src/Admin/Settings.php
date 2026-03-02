@@ -65,6 +65,16 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
 
             register_setting(
                 self::SETTINGS_GROUP,
+                'fl_custom_log_dir',
+                array(
+                'type' => 'string',
+                'sanitize_callback' => 'sanitize_text_field',
+                'default' => '',
+            )
+            );
+
+            register_setting(
+                self::SETTINGS_GROUP,
                 'fl_github_update_token',
                 array(
                 'type' => 'string',
@@ -92,6 +102,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 'fl_retention_days',
                 'Speicherdauer (in Tagen)',
                 array($this, 'render_retention_field'),
+                self::PAGE_SLUG,
+                'fl_pages_section'
+            );
+
+            add_settings_field(
+                'fl_custom_log_dir',
+                'Dateipfad für Logs (Absolut)',
+                array($this, 'render_custom_log_dir_field'),
                 self::PAGE_SLUG,
                 'fl_pages_section'
             );
@@ -153,6 +171,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
 
             echo '<input type="password" name="fl_github_update_token" value="' . esc_attr($value) . '" class="regular-text" />';
             echo '<p class="description">Falls dieses Plugin in einem privaten GitHub Repository liegt, füge hier deinen <a href="https://github.com/settings/tokens" target="_blank">Personal Access Token (classic)</a> mit dem <code>repo</code> Scope ein, damit automatische Updates installiert werden können.</p>';
+        }
+
+        public function render_custom_log_dir_field()
+        {
+            $value = (string)get_option('fl_custom_log_dir', '');
+
+            echo '<input type="text" name="fl_custom_log_dir" value="' . esc_attr($value) . '" class="regular-text" style="width: 100%; max-width: 600px;" placeholder="/var/www/virtual/user/logs" />';
+            echo '<p class="description">Optional: Überschreibe den automatischen Dateipfad (<code>wp-content/uploads/form-logs/</code>) mit einem festen absoluten Pfad auf deinem Server. Besonders nützlich bei restriktiven Hostern wie Mittwald oder komplexen Nginx Setups.</p>';
         }
 
         public function render_empty_pages_notice()
