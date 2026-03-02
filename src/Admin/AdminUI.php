@@ -454,7 +454,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
             // Categorize
             if ($is_captcha) {
-                return '<span class="sf-badge" style="background-color:#ffd54f; color:#3e2723; border: 1px solid #ffca28;">Spamschutz / Captcha</span>';
+                return '<span class="sf-badge sf-badge-warning" style="background-color:#ffd54f !important; color:#3e2723 !important; border: 1px solid #ffca28 !important;">Spamschutz (' . esc_html($captcha_type) . ')</span>';
             }
 
             if ($stage === 'form_validation_failed' || $stage === 'form_field_invalid' || $has_validation_errors || ($stage === 'form_submission_error' && $status === 'failed')) {
