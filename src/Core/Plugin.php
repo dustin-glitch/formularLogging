@@ -40,6 +40,9 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         /** @var Settings */
         private $settings;
 
+        /** @var Crypto */
+        private $crypto;
+
         public static function instance()
         {
             if (self::$instance === null) {
@@ -51,11 +54,12 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
 
         private function __construct()
         {
+            $this->crypto = new Crypto();
             $this->context = new RequestContext(self::REQUEST_FIELD);
-            $this->storage = new LogStorage();
+            $this->storage = new LogStorage($this->crypto);
             $this->mail_logger = new MailLogger($this->storage, $this->context);
             $this->ajax_logger = new AjaxLogger($this->storage, $this->context, self::NONCE_ACTION);
-            $this->admin_ui = new AdminUI($this->storage);
+            $this->admin_ui = new AdminUI($this->storage, $this->crypto);
             $this->settings = new Settings();
 
             $this->register_hooks();
@@ -196,12 +200,20 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
                         $args['response'] = $response->toArray();
                     }
 
+                    $status = 'info';
+                    $stage = 'yootheme_form_submission';
+
+                    if ($response && method_exists($response, 'hasErrors') && $response->hasErrors()) {
+                        $status = 'error';
+                        $stage = 'form_validation_failed';
+                    }
+
                     $this->storage->write_log(
                         array(
                         'request_id' => $this->context->resolve_request_id(),
                         'event_type' => 'form_engine_hook',
-                        'event_stage' => 'yootheme_form_submission',
-                        'status' => 'info',
+                        'event_stage' => $stage,
+                        'status' => $status,
                         'source' => 'essentials_hook',
                         'form_identifier' => $this->context->detect_form_identifier(),
                         'extra_json' => $this->context->json_encode_safe($args),
