@@ -43,6 +43,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
             return $this->columns;
         }
 
+        /** @var \Signalfeuer\FormularLogs\Core\Crypto */
+        private $crypto;
+
+        public function __construct(\Signalfeuer\FormularLogs\Core\Crypto $crypto)
+        {
+            $this->crypto = $crypto;
+        }
+
         public function get_log_dir()
         {
             $uploads = wp_get_upload_dir();
@@ -97,8 +105,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 return;
             }
 
-            $retention_days = absint($retention_days);
-            if ($retention_days < 1) {
+            $retention_days = floatval($retention_days);
+            if ($retention_days <= 0) {
                 $retention_days = 30;
             }
 
@@ -228,7 +236,15 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 if (is_array($value) || is_object($value)) {
                     $value = $context->json_encode_safe($value);
                 }
-                $ordered[] = is_scalar($value) ? (string)$value : '';
+
+                $scalar_val = is_scalar($value) ? (string)$value : '';
+
+                if ($column === 'payload_json' && $scalar_val !== '') {
+                    $ordered[] = $this->crypto->encrypt($scalar_val);
+                }
+                else {
+                    $ordered[] = $scalar_val;
+                }
             }
 
             return $ordered;
