@@ -423,29 +423,52 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             // Check Extra JSON for Captchas & Validation Details
             $is_captcha = false;
             $has_validation_errors = false;
+            $captcha_type = '';
+            $failed_fields = array();
 
-            $captcha_keywords = array('recaptcha', 'hcaptcha', 'turnstile', 'frcaptcha', 'friendly', 'honeypot');
+            $captcha_keywords = array(
+                'recaptcha' => 'reCAPTCHA',
+                'hcaptcha' => 'hCaptcha',
+                'turnstile' => 'Cloudflare Turnstile',
+                'frcaptcha' => 'FriendlyCaptcha',
+                'friendly' => 'FriendlyCaptcha',
+                'honeypot' => 'Honeypot'
+            );
 
             if (is_array($extraDecoded)) {
+                // Determine if there are general errors
+                if (isset($extraDecoded['error']) && !empty($extraDecoded['error'])) {
+                    $has_validation_errors = true; // Fallback so it doesn't default to system error
+                }
+
                 // Check direct field
                 if (isset($extraDecoded['field'])) {
                     $has_validation_errors = true;
-                    foreach ($captcha_keywords as $ck) {
-                        if (stripos((string)$extraDecoded['field'], $ck) !== false) {
+                    $field_val = (string)$extraDecoded['field'];
+                    $failed_fields[] = $field_val;
+
+                    foreach ($captcha_keywords as $ck => $name) {
+                        if (stripos($field_val, $ck) !== false || (isset($extraDecoded['message']) && stripos((string)$extraDecoded['message'], $ck) !== false)) {
                             $is_captcha = true;
+                            $captcha_type = $name;
                             break;
                         }
                     }
                 }
 
                 // Check nested validation object (e.g. YOOtheme)
-                if (isset($extraDecoded['validation']) && is_array($extraDecoded['validation']) && !empty($extraDecoded['validation'])) {
-                    $has_validation_errors = true;
-                    foreach (array_keys($extraDecoded['validation']) as $v_key) {
-                        foreach ($captcha_keywords as $ck) {
-                            if (stripos((string)$v_key, $ck) !== false) {
-                                $is_captcha = true;
-                                break 2;
+                if (isset($extraDecoded['validation']) && is_array($extraDecoded['validation'])) {
+                    if (!empty($extraDecoded['validation'])) {
+                        $has_validation_errors = true;
+                        foreach ($extraDecoded['validation'] as $v_key => $v_messages) {
+                            $failed_fields[] = $v_key;
+
+                            foreach ($captcha_keywords as $ck => $name) {
+                                if (stripos((string)$v_key, $ck) !== false || (is_array($v_messages) && stripos(implode(' ', $v_messages), $ck) !== false)) {
+                                    $is_captcha = true;
+                                    $captcha_type = $name;
+                                    break 2;
+                                }
                             }
                         }
                     }
@@ -457,11 +480,24 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 return '<span class="sf-badge sf-badge-warning" style="background-color:#ffd54f !important; color:#3e2723 !important; border: 1px solid #ffca28 !important;">Spamschutz (' . esc_html($captcha_type) . ')</span>';
             }
 
-            if ($stage === 'form_validation_failed' || $stage === 'form_field_invalid' || $has_validation_errors || ($stage === 'form_submission_error' && $status === 'failed')) {
-                return '<span class="sf-badge sf-badge-warning">Nutzer/Validierung</span>';
+            if ($stage === 'form_validation_failed' || $stage === 'form_field_invalid' || $has_validation_errors) {
+                $desc = 'Nutzer/Validierung';
+                if (!empty($failed_fields)) {
+                    // Remove duplicates and limit to 2 fields + "..."
+                    $failed_fields = array_unique($failed_fields);
+                    if (count($failed_fields) > 2) {
+                        $desc .= ' (' . esc_html($failed_fields[0]) . ', ' . esc_html($failed_fields[1]) . ', ...)';
+                    }
+                    else {
+                        $desc .= ' (' . esc_html(implode(', ', $failed_fields)) . ')';
+                    }
+                }
+                return '<span class="sf-badge sf-badge-warning">' . $desc . '</span>';
             }
 
-            if ($status === 'error' || $status === 'failed' || $stage === 'wp_mail_failed' || $stage === 'form_submission_error') {
+            // In YOOessentials, submission errors that aren't validation/captcha are often API or config issues.
+            // But if it reached here from frontend as form_submission_error with status error, it's a Systemfehler
+            if ($status === 'error' || $status === 'failed' || $stage === 'wp_mail_failed' || $stage === 'form_submission_error' || $stage === 'mail_send_failed') {
                 return '<span class="sf-badge sf-badge-error">System-/Mailerfehler</span>';
             }
 
