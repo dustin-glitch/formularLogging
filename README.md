@@ -4,72 +4,165 @@ Ein modernes, datenschutzkonformes WordPress-Plugin zum detaillierten Protokolli
 
 Besonders geeignet für Fehleranalysen bei YOOtheme Pro Form-Elementen, YOOessentials und Drittanbieter-Mailern wie WP Mail SMTP.
 
+---
+
 ## ✨ Features
 
-- **🚀 Native YOOtheme & YOOessentials Integration:** Erkennt Javascript-Events von UIkit und protokolliert Formulareinsendungen sowie Honeypot-Validierungsfehler direkt an der Quelle.
-- **🛡️ 100% DSGVO / GDPR-Konform:**
-  - **AES-256 Verschlüsselung**: Sensible JSON-Payloads (Benutzereingaben) werden vor dem Speichern mit einer 256-Bit starken AES-Verschlüsselung (`Crypto`) encodiert. Nur das Dashboard entschlüsselt on-the-fly.
-  - **IP-Anonymisierung**: Die letzte Stelle der IP-Adresse des Users wird maskiert (`192.168.1.*`), bevor sie im Log landet.
-  - **Verzeichnis-Absicherung**: Logs werden in `.csv`-Dateien geschrieben, die strikt durch dynamische `.htaccess`- und `index.php`-Sicherungen vor öffentlichem Zugriff geschützt sind.
-  - **Konfigurierbare Speicherdauer**: Logs werden nach einer einstellbaren Dauer (Standard: 30 Tage) vollautomatisch vom Server gelöscht.
-- **✉️ WP Mail SMTP Support:** Fängt tiefe Fehler im Mail-Prozess ab, lange bevor WordPress sie bemerkt. Ideal für das Debugging von SMTP-, Login- oder Connection-Timeouts.
-- **📊 Modernes Admin-Interface & Signalfeuer Brand:** 
-  - **Dashboard Widget**: Verpasse keine Fehler! Das Widget fasst die Logs des Tages direkt auf deinem WordPress-Start-Dashboard zusammen.
-  - Elegante, übersichtliche Log-Tabelle im Backend im wunderschönen **Signalfeuer** Design.
-  - **Detaillierte Fehlerklassifizierung:** Badges markieren Probleme exakt (z.B. "Spamschutz (hCaptcha)", "Nutzer/Validierung (email_field)" oder "Systemfehler").
-  - **JSON-Modal**: Erlaubt das bequeme Analysieren detaillierter (und on-the-fly entschlüsselter) Daten-Payloads auf Knopfdruck.
-- **🔄 Automatischer Update Checker (PUC):** Das Plugin aktualisiert sich direkt über unser GitHub-Repository. Bei privaten Repositories kann ganz einfach ein Access-Token in den Einstellungen hinterlegt werden.
+### 📋 End-to-End Formular-Logging
+- Automatische Protokollierung aller Formular-Einsendungen, Validierungsfehler und Server-Antworten
+- Jede Anfrage erhält eine eindeutige **Request-ID** für lückenlose Nachverfolgung über alle Pipeline-Schritte
+- Unterstützung für HTML5-Validierung, Captcha-Fehler (reCAPTCHA, hCaptcha, Turnstile, FriendlyCaptcha) und Honeypot-Erkennung
+- Gesonderte Upload-Überwachung für Datei-Felder (`uploadLogger.js`)
+
+### 🚀 Native YOOtheme & YOOessentials Integration
+- Erkennt UIkit-Events und protokolliert `yooessentials-form:submit`, `submitted`, `submission-error` und `validation-error` direkt an der Quelle
+- Beherrschung serverseitiger YOOtheme `form.submission`-Events inkl. Fehlererkennung
+- Optionale Hook-Anbindung an YOOessentials-Formulardaten (`essentials_form_*`)
+
+### ✉️ WP Mail & SMTP Support
+- Fängt die gesamte Mail-Pipeline ab: `wp_mail` → `phpmailer_init` → `wp_mail_succeeded` / `wp_mail_failed`
+- Tiefgehende SMTP-Diagnose: Mailer-Typ, Host, Port, Auth und Verschlüsselung werden mitgeloggt
+- Spezial-Hook für **WP Mail SMTP** Plugin-Fehler (`wp_mail_smtp_mailcatcher_send_failed`)
+
+### 🛡️ Rate Limiting & IP-Blockierung
+- **Temporäre Sperre**: Blockiert IPs automatisch nach zu vielen Fehlern innerhalb eines 5-Minuten-Fensters
+- **Permanente Sperre**: Optional dauerhafte Blockierung bei Schwellenwert-Überschreitung
+- Konfigurierbare Parameter: Fehler-Schwellenwert, Sperrdauer, Sperr-Aktion (temporär/permanent)
+- Verwaltungstabelle im Backend zum Einsehen und Entsperren blockierter IPs
+- **Admin-Schutz**: Eingeloggte Administratoren, das Admin-Dashboard und `wp-login.php` werden nie blockiert
+
+### 🔐 100% DSGVO / GDPR-Konform
+- **AES-256-CBC Verschlüsselung**: Sensible JSON-Payloads (Benutzereingaben) werden vor dem Speichern verschlüsselt. Nur das Admin-Dashboard entschlüsselt on-the-fly
+- **IP-Anonymisierung**: Die letzte Stelle der IP wird maskiert (`192.168.1.***`) — für IPv6 analog
+- **Verzeichnis-Absicherung**: `.htaccess` (`Deny from all`) und `index.php` werden automatisch erzeugt
+- **Konfigurierbare Speicherdauer**: Automatische Löschung nach einstellbarer Dauer (Standard: 30 Tage)
+- **Manuelle Bereinigung**: Sofort-Löschung alter Logs per Button im Admin
+
+### 📊 Dashboard & Admin-Interface
+- **Dashboard-Widget** mit Tagesübersicht (Anfragen, Erfolge, Fehler) und interaktivem **Chart.js-Liniendiagramm** der letzten 7 Tage
+- Übersichtliche Log-Tabelle mit Gruppierung nach Request-ID
+- **Fehlerklassifizierung** mit farbigen Badges:
+  - 🟢 *Erfolgreich / Info*
+  - 🟡 *Nutzer/Validierung (feldname)* — zeigt betroffene Felder
+  - 🟡 *Spamschutz (hCaptcha / reCAPTCHA / …)* — erkennt Captcha-Typ automatisch
+  - 🔴 *System-/Mailerfehler*
+  - 🔴 *JS Fehler*
+- **JSON-Modal** mit strukturierter Zusammenfassung: Validierungsfehler werden als lesbare Liste dargestellt, bevor der rohe JSON angezeigt wird
+- Filter nach Datum, Request-ID, Status und Event-Typ
+- CSV-Download der Tages-Logs
+
+### 🔄 Automatische Updates
+- Integrierter **Plugin Update Checker (PUC)** für nahtlose Updates direkt über GitHub
+- Unterstützung für private Repos via GitHub Access Token
+
+---
 
 ## 📦 Installation
 
-1. Lade dieses Plugin auf deinen Webserver oder in dein lokales Entwicklungsverzeichnis herunter.
-2. Kopiere den Ordner `formular-logging` nach `wp-content/plugins/`.
-3. Gehe im WordPress-Backend unter **Plugins** auf "Aktivieren".
-4. Navigiere im Backend links zum neuen Menüpunkt **Formular Logs -> Einstellungen** und konfiguriere die Formularseiten (z. B. `/kontakt`).
+1. Lade den Plugin-Ordner `formular-logging` herunter
+2. Kopiere ihn nach `wp-content/plugins/`
+3. Aktiviere das Plugin unter **Plugins** im WordPress-Backend
+4. Navigiere zu **Formular Logs → Einstellungen** und konfiguriere deine Formularseiten
+
+---
 
 ## ⚙️ Einstellungen
 
-Unter `Formular Logs -> Einstellungen` können detaillierte Konfigurationen für die Formulare vorgenommen werden:
-- **Formularseiten**: Liste alle URLs oder Slugs auf (eine Zeile pro URL), auf denen die Formular-Überwachungslogik greifen soll.
-- **Speicherdauer (in Tagen)**: Definiert, wie viele Tage die sicher hinterlegten CSV-Log-Dateien auf dem Server verweilen, bevor ein Cronjob diese restlos und DSGVO-konform vernichtet.
-- **Dateipfad für Logs (Absolut)**: Erlaubt es, den standardmäßigen Speicherort (`wp-content/uploads/form-logs/`) mit einem absoluten Server-Pfad zu überschreiben (z.B. `/var/www/virtual/user/logs/`). Sehr nützlich für Server wie Mittwald mit speziellen Nginx/Ordner-Restriktionen.
-- **GitHub Access Token (für Updates)**: Wenn dieses Repository privat geschaltet ist, kann hier ein Token hinterlegt werden, um nahtlose, automatische WordPress-Updates im Hintergrund zu erlauben.
+Unter **Formular Logs → Einstellungen**:
 
-## 🛠 Setup & Integration (Schritt-für-Schritt)
+### Frontend Logging Seiten
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Formularseiten** | URLs/Slugs der Seiten mit Formularen (eine pro Zeile). Das Plugin lädt die Logger-Skripte *nur* auf diesen Seiten. Beispiele: `/kontakt`, `/jetzt-bewerben` |
+| **Speicherdauer** | Wie lange CSV-Logs gespeichert werden, bevor sie automatisch gelöscht werden (Standard: 30 Tage, Kommazahlen für Tests möglich) |
+| **Dateipfad für Logs** | Optional: Absoluter Server-Pfad statt `wp-content/uploads/form-logs/`. Nützlich bei restriktiven Hostern |
+| **GitHub Access Token** | Personal Access Token für automatische Updates bei privaten Repos |
 
-Sobald das Plugin installiert ist, musst du es für deine Formularseiten scharf schalten.
+### Rate Limiting & Sicherheit
+| Einstellung | Beschreibung |
+|-------------|-------------|
+| **Rate Limiting aktivieren** | Schaltet die IP-Blockierung bei zu vielen Fehlern ein |
+| **Fehler-Schwellenwert** | Anzahl Fehler in 5 Min. bevor eine IP blockiert wird (Standard: 20) |
+| **Sperrdauer** | Minuten einer temporären Sperre (Standard: 60) |
+| **Aktion bei Überschreitung** | Temporär (für die eingestellte Dauer) oder permanent (manuelles Entsperren nötig) |
 
-1. **Seiten registrieren**: Gehe zu **Formular Logs -> Einstellungen** und trage in das Textfeld die URLs ein, auf denen sich deine Formulare befinden. 
-   - Beispiele: `/kontakt`, `/jetzt-bewerben` oder `https://meine-domain.de/support`.
-   - Das Plugin lädt seine (super-leichten) Erkennungsskripte *nur* auf diesen spezifischen Seiten, um die WordPress-Performance anderswo nicht zu beeinträchtigen.
-2. **Formulare abschicken**: Konfiguriere dein Formular (z.B. in YOOtheme Pro) wie gewohnt. 
-   - Sobald ein Nutzer das Formular absendet, schaltet sich die Javascript-Logik (oder beim Senden die WP Mail SMTP Hook-Logik) dieses Plugins dazwischen.
-   - Alle Submit-Events, Feld-Validierungsfehler und Antworten vom Server werden automatisch über APIs geloggt.
-3. **Logs prüfen**: Sende ein Test-Formular ab. Navigiere anschließend zu **Formular Logs -> Alle Logs**.
-   - Du siehst nun den neuen Block ("Request ID") für deine Test-Anfrage.
-   - Wenn auf der Frontend-Seite z.B. das FriendlyCaptcha fehlschlägt, wird der Backend-Log dir sofort ein präzises gelbes Warn-Badge ("Spamschutz") anzeigen.
-   - Mit einem Klick auf **JSON ansehen** kannst du jederzeit den Inhalt deines Test-Requests (entschlüsselt) betrachten.
+---
 
-## 🔒 Sicherheit & .htaccess
+## 🛠 Setup & Integration
 
-Da die geloggten Formulardaten in CSV-Dateien gespeichert werden, greifen strenge Sicherheitsmechanismen:
+### 1. Seiten registrieren
+Trage unter **Einstellungen** die URLs deiner Formularseiten ein:
+```
+/kontakt
+/jetzt-bewerben
+https://meine-domain.de/support
+```
+Die Logger-Skripte werden ausschließlich auf diesen Seiten geladen.
 
-- **Apache Server:** Das Plugin kümmert sich um alles selbst! Sobald das Verzeichnis `wp-content/uploads/form-logs/` erstellt wird, wird automatisch eine restriktive `.htaccess`-Datei (`Deny from all`) und eine `index.php` erzeugt. Dadurch ist direkter Dateizugriff von außen unmöglich.
-- **Nginx Server:** Da Nginx `.htaccess`-Dateien naturgemäß ignoriert, **musst** du folgenden Block in deine Nginx Server-Konfiguration (`server { ... }`) oder Plesk-Zusatzrichtlinien eintragen:
+### 2. Formulare nutzen
+Konfiguriere dein Formular (z.B. in YOOtheme Pro) wie gewohnt. Das Plugin schaltet sich automatisch dazwischen:
+- **Frontend**: JavaScript erkennt Submit-Events, Validierungsfehler und Server-Antworten
+- **Backend**: PHP-Hooks fangen Mail-Versand, SMTP-Konfiguration und Fehler ab
 
+### 3. Logs prüfen
+Navigiere zu **Formular Logs → Alle Logs**:
+- Jede Anfrage erscheint als gruppierter Block mit Request-ID
+- Badges zeigen auf einen Blick: Erfolg, Validierungsfehler oder Systemfehler
+- Klicke auf **JSON ansehen** um Payload-Details (verschlüsselt gespeichert, on-the-fly entschlüsselt) zu sehen
+
+---
+
+## 🔒 Sicherheit
+
+### Apache Server
+Das Plugin erstellt automatisch eine restriktive `.htaccess` und `index.php` im Log-Verzeichnis. **Kein weiterer Handlungsbedarf.**
+
+### Nginx Server
+Da Nginx `.htaccess` ignoriert, füge diesen Block in deine Server-Konfiguration ein:
 ```nginx
-# Formular Logging Plugin: Schutz des Log-Verzeichnisses
+# Formular Logging: Log-Verzeichnis absichern
 location ^~ /wp-content/uploads/form-logs/ {
     deny all;
     return 403;
 }
 ```
 
-## 👨‍💻 Entwicklerhinweise
+### IP-Erkennung
+Die IP-Adresse wird primär über `REMOTE_ADDR` ermittelt. Falls ein Reverse-Proxy vorgeschaltet ist, werden sekundär `X-Forwarded-For` und `Client-IP` Header ausgewertet.
 
-Das Plugin ist Namespace-strukturiert (`Signalfeuer\FormularLogs\*`) und nutzt einen internen SPL-Autoloader beim Einbinden der `src/`-Ordnerklassen:
+---
 
-- `src/Admin`: Verwaltung der Settings-API und des Log-Darstellungs-UI-Renderings.
-- `src/Core`: `RequestContext`-Builder und Event- / Hook-Registrierung (`Plugin.php`).
-- `src/Loggers`: Spezielle Adapter wie `AjaxLogger` und `MailLogger`.
-- `src/Storage`: Datenspeicherungslogik, Dateischutz und Cleanup (`LogStorage.php`).
+## 👨‍💻 Architektur
+
+```
+formular-logging/
+├── formular-logging.php          # Plugin-Bootstrap, Hooks, Update-Checker
+├── autoloader.php                # SPL-Autoloader für Signalfeuer\FormularLogs\*
+├── uninstall.php                 # Deinstallation (Logs werden bewusst behalten)
+├── src/
+│   ├── Admin/
+│   │   ├── AdminUI.php           # Log-Tabelle, Dashboard-Widget, CSV-Download
+│   │   └── Settings.php          # Einstellungsseite, Rate-Limit-Konfiguration
+│   ├── Core/
+│   │   ├── Plugin.php            # Singleton, Hook-Registrierung, Rate-Limiting
+│   │   ├── Crypto.php            # AES-256-CBC Ver-/Entschlüsselung
+│   │   └── RequestContext.php    # IP, User-Agent, Request-ID, Payload-Handling
+│   ├── Loggers/
+│   │   ├── AjaxLogger.php        # Frontend-AJAX-Endpoint
+│   │   └── MailLogger.php        # wp_mail / phpmailer / WP Mail SMTP Hooks
+│   └── Storage/
+│       └── LogStorage.php        # CSV-Dateien, Cleanup, Verzeichnisschutz
+└── assets/
+    ├── js/
+    │   ├── logger.js             # Frontend-Formular-Erkennung & Event-Logging
+    │   └── uploadLogger.js       # Datei-Upload-Überwachung
+    └── admin/
+        ├── js/admin.js           # JSON-Modal, Dashboard-Chart
+        └── css/admin.css         # Signalfeuer Admin-Branding
+```
+
+---
+
+## 📄 Lizenz
+
+GPLv2 or later
