@@ -229,7 +229,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\RequestContext')) {
 
         public function get_raw_client_ip()
         {
-            $keys = array('HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR');
+            $keys = array('REMOTE_ADDR', 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP');
             foreach ($keys as $key) {
                 if (!empty($_SERVER[$key])) {
                     $raw = wp_unslash($_SERVER[$key]);
@@ -245,7 +245,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\RequestContext')) {
 
         public function get_client_ip()
         {
-            $keys = array('HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR');
+            $keys = array('REMOTE_ADDR', 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP');
             $raw_ip = '';
 
             foreach ($keys as $key) {
