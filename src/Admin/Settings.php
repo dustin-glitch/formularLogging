@@ -119,7 +119,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 'fl_rate_limit_action',
                 array(
                 'type' => 'string',
-                'sanitize_callback' => 'sanitize_text_field',
+                'sanitize_callback' => array($this, 'sanitize_rate_limit_action'),
                 'default' => 'temporary',
             )
             );
@@ -239,12 +239,31 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 echo '</tbody></table>';
 
                 echo '<script>
-                        jQuery(document).ready(func tion (                                 $(".fl-unblock-ip").on("click",  funct                                          e.prev                                              v                                                  if (!confirm("Soll diese IP-Adresse wirklich entsper                               $.post(ajaxurl,                                       action: "fl_unblock                                          ip: btn.da                                              nonce: btn.                                               }                                                                                                                  btn.closest( "t r").fadeOut(300, functio                                
-                                            
-                                                                 rr                                           } 
-                                    ail(function () {
-                                    aler                        ;
-                                            });
+                    jQuery(document).ready(function ($) {
+                        $(".fl-unblock-ip").on("click", function (e) {
+                            e.preventDefault();
+                            var $btn = $(this);
+                            if (!confirm("Soll diese IP-Adresse wirklich entsperrt werden?")) {
+                                return;
+                            }
+                            $.post(ajaxurl, {
+                                action: "fl_unblock_ip",
+                                ip: $btn.data("ip"),
+                                nonce: $btn.data("nonce")
+                            })
+                                .done(function (response) {
+                                    if (response.success) {
+                                        $btn.closest("tr").fadeOut(300, function () {
+                                            $(this).remove();
+                                        });
+                                    } else {
+                                        alert("Fehler: " + (response.data || "Unbekannt"));
+                                    }
+                                })
+                                .fail(function () {
+                                    alert("Ein Serverfehler ist aufgetreten.");
+                                });
+                        });
                     });
                 </script>';
                 echo '</div>';
@@ -393,6 +412,13 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
         {
             $value = str_replace(',', '.', (string)$value);
             return floatval($value);
+        }
+
+        public function sanitize_rate_limit_action($value)
+        {
+            $allowed = array('temporary', 'permanent');
+            $value = sanitize_text_field((string)$value);
+            return in_array($value, $allowed, true) ? $value : 'temporary';
         }
 
         public function get_normalized_form_paths()

@@ -105,6 +105,13 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
 
         public function check_ip_block()
         {
+            global $pagenow;
+
+            // Do not block admin dashboard, login page, or logged-in administrators
+            if (is_admin() || $pagenow === 'wp-login.php' || current_user_can('manage_options')) {
+                return;
+            }
+
             $ip = $this->context->get_raw_client_ip();
             if ($ip === '') {
                 return;

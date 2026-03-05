@@ -152,6 +152,68 @@
         return !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
     }
 
+    function safeSerializeCtx(ctx) {
+        var result = {};
+        if (!ctx || typeof ctx !== 'object') {
+            return result;
+        }
+
+        // Collect non-DOM, non-function properties from ctx
+        Object.keys(ctx).forEach(function (key) {
+            if (key === 'form' || key === 'el') return;
+            var val = ctx[key];
+            if (typeof val === 'function') return;
+            if (val instanceof HTMLElement || val instanceof Node) return;
+            result[key] = val;
+        });
+
+        // Collect validation errors from the DOM if form is available
+        var form = ctx.form || ctx.el;
+        if (form && form instanceof HTMLElement) {
+            var validation = {};
+
+            // HTML5 constraint validation
+            var fields = form.querySelectorAll('input, select, textarea');
+            fields.forEach(function (field) {
+                if (!field.name) return;
+                if (field.validity && !field.validity.valid) {
+                    validation[field.name] = [field.validationMessage || 'Invalid'];
+                }
+            });
+
+            // YOOtheme / UIkit visible error messages
+            var errorEls = form.querySelectorAll(
+                '.uk-form-danger, .uk-alert-danger, .el-form-error, ' +
+                '[class*="error-message"], [class*="form-error"], ' +
+                '.yooessentials-form-error'
+            );
+            var messages = [];
+            errorEls.forEach(function (el) {
+                var text = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                if (text && messages.indexOf(text) === -1) {
+                    messages.push(text);
+                }
+                // Try to associate error with its field
+                var fieldEl = el.closest('.uk-margin, .el-form-row, .form-group');
+                if (fieldEl) {
+                    var input = fieldEl.querySelector('input, select, textarea');
+                    if (input && input.name && !validation[input.name]) {
+                        validation[input.name] = [text];
+                    }
+                }
+            });
+
+            if (Object.keys(validation).length > 0) {
+                result.validation = validation;
+            }
+            if (messages.length > 0) {
+                result.error_messages = messages;
+            }
+        }
+
+        return result;
+    }
+
     function debugLog(title, data) {
         if (!config.debugMode) return;
         console.log('[Formular Logging] ' + title, data || '');
@@ -181,7 +243,16 @@
         entry.style.borderBottom = '1px solid #444';
         entry.style.paddingBottom = '5px';
         var statusColor = (data && (data.status === 'error' || data.status === 'failed')) ? '#ff6b6b' : '#4dabf7';
-        entry.innerHTML = '<strong style="color:' + statusColor + '">' + title + '</strong>' + (data ? '<br>' + JSON.stringify(data.event_stage || data) : '');
+        var strong = document.createElement('strong');
+        strong.style.color = statusColor;
+        strong.textContent = title;
+        entry.appendChild(strong);
+        if (data) {
+            entry.appendChild(document.createElement('br'));
+            var detail = document.createElement('span');
+            detail.textContent = JSON.stringify(data.event_stage || data);
+            entry.appendChild(detail);
+        }
         overlayArea.appendChild(entry);
         overlayArea.scrollTop = overlayArea.scrollHeight;
     }
@@ -376,7 +447,7 @@
                         event_stage: 'form_submitted_success',
                         status: 'success',
                         form_identifier: formIdentifier(ctx.form),
-                        extra_json: JSON.stringify(ctx.response || {})
+                        extra_json: JSON.stringify(safeSerializeCtx(ctx))
                     }, false);
                 });
 
@@ -389,7 +460,7 @@
                         event_stage: 'form_submission_error',
                         status: 'error',
                         form_identifier: formIdentifier(ctx.form),
-                        extra_json: JSON.stringify({ error: ctx.error, errors: ctx.errors, validation: ctx.validation })
+                        extra_json: JSON.stringify(safeSerializeCtx(ctx))
                     }, false);
                 });
 
@@ -402,7 +473,7 @@
                         event_stage: 'form_validation_failed',
                         status: 'failed',
                         form_identifier: formIdentifier(ctx.form),
-                        extra_json: JSON.stringify(ctx.data || {})
+                        extra_json: JSON.stringify(safeSerializeCtx(ctx))
                     }, false);
                 });
             });
