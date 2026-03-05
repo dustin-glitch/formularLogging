@@ -59,7 +59,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             echo '</div>';
 
             echo '<script>';
-            echo 'var flStatsData = ' . wp_json_encode($stats) . ';';
+            echo 'var flStatsData = '.wp_json_encode($stats). ';';
             echo '</script>';
 
             echo '<div style="margin-top:20px;">';
@@ -378,6 +378,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
     <div class="sf-modal-content">
         <span id="fl-modal-close" class="sf-modal-close">&times;</span>
         <h2>JSON Daten</h2>
+        <div id="fl-modal-summary"></div>
         <pre><code id="fl-modal-content"></code></pre>
     </div>
 </div>
@@ -388,7 +389,11 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         private function is_valid_date($date)
         {
-            return (bool)preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$date);
+            $date = (string)$date;
+            if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m)) {
+                return false;
+            }
+            return checkdate((int)$m[2], (int)$m[3], (int)$m[1]);
         }
 
         private function classify_problem($row)

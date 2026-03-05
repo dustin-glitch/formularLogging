@@ -137,7 +137,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
 
                 $modified = filemtime($file);
                 if ($modified !== false && $modified < $threshold) {
-                    @unlink($file);
+                    wp_delete_file($file);
                 }
             }
         }
