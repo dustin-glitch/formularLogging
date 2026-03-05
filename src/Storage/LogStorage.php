@@ -69,7 +69,16 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 $date = wp_date('Y-m-d');
             }
 
-            return trailingslashit($this->get_log_dir()) . 'form-log-' . $date . '.csv';
+            $log_dir = trailingslashit($this->get_log_dir());
+            $pattern = $log_dir . 'form-log-' . $date . '*.csv';
+            $existing = glob($pattern);
+
+            if (!empty($existing) && is_array($existing)) {
+                return $existing[0];
+            }
+
+            $hash = wp_generate_password(16, false, false);
+            return $log_dir . 'form-log-' . $date . '-' . $hash . '.csv';
         }
 
         public function write_log(array $row, RequestContext $context)
@@ -91,7 +100,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
             }
 
             clearstatcache(true, $path);
-            $is_empty = !file_exists($path) || filesize($path) === 0;
+            $is_empty = filesize($path) === 0;
             if ($is_empty) {
                 fputcsv($handle, $this->columns);
             }
@@ -131,6 +140,67 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                     @unlink($file);
                 }
             }
+        }
+
+        public function get_aggregated_stats_for_last_days($days = 7)
+        {
+            $stats = array(
+                'labels' => array(),
+                'success' => array(),
+                'errors' => array()
+            );
+
+            for ($i = $days - 1; $i >= 0; $i--) {
+                $time = time() - ($i * DAY_IN_SECONDS);
+                $date = wp_date('Y-m-d', $time);
+                $path = $this->get_daily_log_path($date);
+
+                $success = 0;
+                $errors = 0;
+
+                if (file_exists($path)) {
+                    $rows = $this->read_filtered_rows($path, array(), 5000);
+                    $grouped = array();
+
+                    foreach ($rows as $row) {
+                        $req_id = isset($row['request_id']) && $row['request_id'] !== '' ? $row['request_id'] : 'unknown_' . md5(wp_json_encode($row));
+                        if (!isset($grouped[$req_id])) {
+                            $grouped[$req_id] = array('has_error' => false);
+                        }
+
+                        $status = isset($row['status']) ? (string)$row['status'] : '';
+                        $type = isset($row['event_type']) ? (string)$row['event_type'] : '';
+                        $stage = isset($row['event_stage']) ? (string)$row['event_stage'] : '';
+
+                        if ($status === 'error' || $status === 'failed' || $type === 'frontend_js_error' || $stage === 'form_validation_failed' || $stage === 'form_field_invalid' || $stage === 'wp_mail_failed' || $stage === 'form_submission_error' || $stage === 'mail_send_failed') {
+                            $grouped[$req_id]['has_error'] = true;
+                        }
+
+                        $extra = isset($row['extra_json']) ? (string)$row['extra_json'] : '';
+                        if ($extra !== '') {
+                            $extraDecoded = @json_decode($extra, true);
+                            if (is_array($extraDecoded) && (!empty($extraDecoded['error']) || isset($extraDecoded['field']) || !empty($extraDecoded['validation']))) {
+                                $grouped[$req_id]['has_error'] = true;
+                            }
+                        }
+                    }
+
+                    foreach ($grouped as $g) {
+                        if ($g['has_error']) {
+                            $errors++;
+                        }
+                        else {
+                            $success++;
+                        }
+                    }
+                }
+
+                $stats['labels'][] = wp_date('d.m.', $time);
+                $stats['success'][] = $success;
+                $stats['errors'][] = $errors;
+            }
+
+            return $stats;
         }
 
         public function read_filtered_rows($path, array $filters, $limit)

@@ -68,6 +68,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         private function register_hooks()
         {
             add_action('init', array($this, 'schedule_cleanup_event'));
+            add_action('init', array($this, 'check_ip_block'), 1);
             add_action(self::CRON_HOOK, array($this, 'run_cleanup'));
 
             add_filter('wp_mail', array($this->mail_logger, 'log_mail_pre_send'), 10, 1);
@@ -79,6 +80,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
 
             add_action('wp_ajax_' . self::AJAX_ACTION, array($this->ajax_logger, 'handle_frontend_event'));
             add_action('wp_ajax_nopriv_' . self::AJAX_ACTION, array($this->ajax_logger, 'handle_frontend_event'));
+
+            add_action('wp_ajax_fl_unblock_ip', array($this, 'ajax_unblock_ip'));
 
             add_action('wp_enqueue_scripts', array($this, 'enqueue_frontend_assets'));
             add_action('plugins_loaded', array($this, 'register_optional_form_engine_hooks'), 20);
@@ -98,6 +101,93 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
             if (!wp_next_scheduled(self::CRON_HOOK)) {
                 wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', self::CRON_HOOK);
             }
+        }
+
+        public function check_ip_block()
+        {
+            $ip = $this->context->get_raw_client_ip();
+            if ($ip === '') {
+                return;
+            }
+
+            // 1. Check permanent block
+            $permanently_blocked = get_option('fl_permanently_blocked_ips', array());
+            if (is_array($permanently_blocked) && isset($permanently_blocked[$ip])) {
+                wp_die('Abgewiesen durch Signalfeuer Formular Logging: Diese IP-Adresse wurde permanent blockiert.', 'Access Denied', array('response' => 403));
+            }
+
+            // 2. Check temporary rate limit block
+            if (!get_option('fl_rate_limit_enabled', false)) {
+                return;
+            }
+
+            $block_key = 'fl_rl_block_' . md5($ip);
+            if (get_transient($block_key)) {
+                wp_die('Abgewiesen durch Signalfeuer Formular Logging: Zu viele Fehler in kurzer Zeit. Die IP ist vorübergehend blockiert.', 'Rate Limit Exceeded', array('response' => 429));
+            }
+        }
+
+        public function track_ip_error()
+        {
+            $ip = $this->context->get_raw_client_ip();
+            if ($ip === '') {
+                return;
+            }
+
+            // Rate Limiting Logic Check
+            if (!get_option('fl_rate_limit_enabled', false)) {
+                return;
+            }
+
+            $transient_key = 'fl_rl_err_' . md5($ip);
+            $errors = (int)get_transient($transient_key);
+            $errors++;
+
+            set_transient($transient_key, $errors, 5 * MINUTE_IN_SECONDS);
+
+            $threshold = (int)get_option('fl_rate_limit_threshold', 20);
+            if ($errors >= $threshold) {
+                $action = get_option('fl_rate_limit_action', 'temporary');
+                if ($action === 'permanent') {
+                    $permanently_blocked = get_option('fl_permanently_blocked_ips', array());
+                    if (!is_array($permanently_blocked)) {
+                        $permanently_blocked = array();
+                    }
+                    $permanently_blocked[$ip] = array(
+                        'time' => time(),
+                        'reason' => 'Rate Limit (' . $threshold . ' Fehler) überschritten'
+                    );
+                    update_option('fl_permanently_blocked_ips', $permanently_blocked);
+                }
+                else {
+                    $block_key = 'fl_rl_block_' . md5($ip);
+                    $duration = (int)get_option('fl_rate_limit_duration', 60);
+                    set_transient($block_key, 1, $duration * MINUTE_IN_SECONDS);
+                }
+
+                delete_transient($transient_key);
+            }
+        }
+
+        public function ajax_unblock_ip()
+        {
+            check_ajax_referer('fl_unblock_ip', 'nonce');
+            if (!current_user_can('manage_options')) {
+                wp_send_json_error('Berechtigung fehlt');
+            }
+
+            $ip = isset($_POST['ip']) ? sanitize_text_field(wp_unslash($_POST['ip'])) : '';
+            if ($ip === '') {
+                wp_send_json_error('IP fehlt');
+            }
+
+            $blocked_ips = get_option('fl_permanently_blocked_ips', array());
+            if (is_array($blocked_ips) && isset($blocked_ips[$ip])) {
+                unset($blocked_ips[$ip]);
+                update_option('fl_permanently_blocked_ips', $blocked_ips);
+            }
+
+            wp_send_json_success();
         }
 
         public function run_cleanup()
@@ -161,7 +251,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
 
             foreach ($candidate_hooks as $hook) {
                 $hook = (string)$hook;
-                if ($hook === '' || has_action($hook) === false) {
+                if ($hook === '') {
                     continue;
                 }
 

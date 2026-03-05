@@ -48,6 +48,10 @@ if (!class_exists('Signalfeuer\FormularLogs\Loggers\AjaxLogger')) {
                 wp_send_json_error(array('message' => 'Missing required fields'), 422);
             }
 
+            if ($status === 'error') {
+                \Signalfeuer\FormularLogs\Core\Plugin::instance()->track_ip_error();
+            }
+
             $ok = $this->storage->write_log(
                 array(
                 'request_id' => $request_id,

@@ -227,6 +227,22 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\RequestContext')) {
             return isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
         }
 
+        public function get_raw_client_ip()
+        {
+            $keys = array('HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR');
+            foreach ($keys as $key) {
+                if (!empty($_SERVER[$key])) {
+                    $raw = wp_unslash($_SERVER[$key]);
+                    $parts = explode(',', (string)$raw);
+                    $candidate = trim((string)$parts[0]);
+                    if ($candidate !== '') {
+                        return sanitize_text_field($candidate);
+                    }
+                }
+            }
+            return '';
+        }
+
         public function get_client_ip()
         {
             $keys = array('HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR');

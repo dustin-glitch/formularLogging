@@ -39,54 +39,29 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         public function render_dashboard_widget()
         {
-            $date = wp_date('Y-m-d');
-            $path = $this->storage->get_daily_log_path($date);
-            $rows = $this->storage->read_filtered_rows($path, array(), 1000);
+            $stats = $this->storage->get_aggregated_stats_for_last_days(7);
 
-            $grouped = array();
-            foreach ($rows as $row) {
-                $req_id = isset($row['request_id']) ? $row['request_id'] : '';
-                if ($req_id === '') {
-                    $req_id = 'unknown_' . md5(wp_json_encode($row));
-                }
-                if (!isset($grouped[$req_id])) {
-                    $grouped[$req_id] = array();
-                }
-                $grouped[$req_id][] = $row;
-            }
-
-            $total = count($grouped);
-            $success = 0;
-            $errors = 0;
-
-            foreach ($grouped as $group_rows) {
-                $has_error = false;
-                $has_success = false;
-                foreach ($group_rows as $row) {
-                    $badgeHtml = $this->classify_problem($row);
-                    if (stripos($badgeHtml, 'fehler') !== false) {
-                        $has_error = true;
-                    }
-                    elseif (stripos($badgeHtml, 'erfolgreich') !== false) {
-                        $has_success = true;
-                    }
-                }
-
-                if ($has_error) {
-                    $errors++;
-                }
-                elseif ($has_success) {
-                    $success++;
-                }
-            }
+            $today_success = end($stats['success']);
+            $today_errors = end($stats['errors']);
+            $today_total = $today_success + $today_errors;
+            $today_date = wp_date('Y-m-d');
 
             echo '<div style="background:#f6f7f7; padding:15px; border-radius:4px; text-align:center; border:1px solid #ccd0d4;">';
-            echo '<h3 style="margin-top:0; color:#1d2327;">Heute (' . esc_html($date) . ')</h3>';
-            echo '<p style="font-size:24px; font-weight:bold; margin:10px 0; color:#1d2327;">' . esc_html((string)$total) . ' <span style="font-size:14px; font-weight:normal; color:#646970;">Anfragen</span></p>';
-            echo '<div style="display:flex; justify-content:space-around; margin-top:15px; padding-top:15px; border-top:1px solid #ccd0d4;">';
-            echo '  <div style="flex:1;"><strong style="color:#00a32a; font-size:18px;">' . esc_html((string)$success) . '</strong><br><span style="color:#646970; font-size:12px;">Erfolgreich</span></div>';
-            echo '  <div style="flex:1;"><strong style="color:#d63638; font-size:18px;">' . esc_html((string)$errors) . '</strong><br><span style="color:#646970; font-size:12px;">Fehler</span></div>';
+            echo '<h3 style="margin-top:0; color:#1d2327;">Heute (' . esc_html($today_date) . ')</h3>';
+            echo '<p style="font-size:24px; font-weight:bold; margin:10px 0; color:#1d2327;">' . esc_html((string)$today_total) . ' <span style="font-size:14px; font-weight:normal; color:#646970;">Anfragen</span></p>';
+            echo '<div style="display:flex; justify-content:space-around; margin-top:10px; padding-bottom:15px; border-bottom:1px solid #ccd0d4;">';
+            echo '  <div style="flex:1;"><strong style="color:#00a32a; font-size:18px;">' . esc_html((string)$today_success) . '</strong><br><span style="color:#646970; font-size:12px;">Erfolgreich</span></div>';
+            echo '  <div style="flex:1;"><strong style="color:#d63638; font-size:18px;">' . esc_html((string)$today_errors) . '</strong><br><span style="color:#646970; font-size:12px;">Fehler</span></div>';
             echo '</div>';
+
+            echo '<div style="margin-top:15px; margin-bottom:15px;">';
+            echo '<canvas id="fl-stats-chart" style="max-height: 200px; width: 100%;"></canvas>';
+            echo '</div>';
+
+            echo '<script>';
+            echo 'var flStatsData = ' . wp_json_encode($stats) . ';';
+            echo '</script>';
+
             echo '<div style="margin-top:20px;">';
             echo '  <a href="' . esc_url(admin_url('admin.php?page=formular-logs')) . '" class="button button-primary" style="background:#F26B22; border-color:#F26B22;">Zu den Logs</a>';
             echo '</div>';
@@ -95,17 +70,26 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         public function enqueue_admin_assets($hook_suffix)
         {
-            if ($hook_suffix === 'toplevel_page_formular-logs' || $hook_suffix === 'formular-logs_page_formular-logs') {
+            if ($hook_suffix === 'toplevel_page_formular-logs' || $hook_suffix === 'formular-logs_page_formular-logs' || $hook_suffix === 'index.php') {
                 wp_enqueue_style(
                     'fl-admin-style',
                     FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/css/admin.css',
                     array(),
                     file_exists(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') ? filemtime(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') : FL_FORMULAR_LOGGING_VERSION
                 );
+
+                wp_enqueue_script(
+                    'chart-js',
+                    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+                    array(),
+                    '4.4.1',
+                    true
+                );
+
                 wp_enqueue_script(
                     'fl-admin-script',
                     FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/js/admin.js',
-                    array(),
+                    array('chart-js'),
                     file_exists(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/js/admin.js') ? filemtime(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/js/admin.js') : FL_FORMULAR_LOGGING_VERSION,
                     true
                 );
@@ -237,7 +221,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 'date' => $date,
                 'fl_download' => '1',
             ),
-                admin_url('tools.php')
+                admin_url('admin.php')
             ),
                 'fl_download_csv'
             );

@@ -152,6 +152,40 @@
         return !!(element && (element.offsetWidth || element.offsetHeight || element.getClientRects().length));
     }
 
+    function debugLog(title, data) {
+        if (!config.debugMode) return;
+        console.log('[Formular Logging] ' + title, data || '');
+
+        var overlayArea = document.getElementById('fl-debug-overlay');
+        if (!overlayArea) {
+            overlayArea = document.createElement('div');
+            overlayArea.id = 'fl-debug-overlay';
+            overlayArea.style.position = 'fixed';
+            overlayArea.style.bottom = '10px';
+            overlayArea.style.left = '10px';
+            overlayArea.style.background = 'rgba(0,0,0,0.8)';
+            overlayArea.style.color = '#fff';
+            overlayArea.style.padding = '10px';
+            overlayArea.style.borderRadius = '5px';
+            overlayArea.style.zIndex = '999999';
+            overlayArea.style.fontSize = '12px';
+            overlayArea.style.fontFamily = 'monospace';
+            overlayArea.style.maxHeight = '200px';
+            overlayArea.style.maxWidth = '300px';
+            overlayArea.style.overflowY = 'auto';
+            document.body.appendChild(overlayArea);
+        }
+
+        var entry = document.createElement('div');
+        entry.style.marginBottom = '5px';
+        entry.style.borderBottom = '1px solid #444';
+        entry.style.paddingBottom = '5px';
+        var statusColor = (data && (data.status === 'error' || data.status === 'failed')) ? '#ff6b6b' : '#4dabf7';
+        entry.innerHTML = '<strong style="color:' + statusColor + '">' + title + '</strong>' + (data ? '<br>' + JSON.stringify(data.event_stage || data) : '');
+        overlayArea.appendChild(entry);
+        overlayArea.scrollTop = overlayArea.scrollHeight;
+    }
+
     function sendEvent(data, preferBeacon) {
         if (!config.ajaxUrl || !config.action || !config.nonce) {
             return;
@@ -176,6 +210,8 @@
             extra_json: data.extra_json || ''
         };
 
+        debugLog('Event queued: ' + basePayload.status, { event_stage: basePayload.event_stage, status: basePayload.status, event_type: basePayload.event_type });
+
         Object.keys(basePayload).forEach(function (key) {
             formBody.append(key, basePayload[key]);
         });
@@ -194,8 +230,8 @@
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
             },
             body: formBody.toString()
-        }).catch(function () {
-            // Deliberately ignore transport errors: logging should never break forms.
+        }).catch(function (e) {
+            debugLog('Transport Error', { error: e.message });
         });
     }
 

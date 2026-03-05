@@ -54,13 +54,13 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Crypto')) {
                 return $data;
             }
 
-            $encrypted = openssl_encrypt($data, self::METHOD, $this->key, 0, $iv);
+            $encrypted = openssl_encrypt($data, self::METHOD, $this->key, OPENSSL_RAW_DATA, $iv);
             if ($encrypted === false) {
                 return $data; // encryption failed
             }
 
-            // Combine IV and encrypted data, then encode
-            return 'FLENC:' . base64_encode($iv . $encrypted);
+            // Combine IV and raw ciphertext, then base64-encode once
+            return 'FLENC2:' . base64_encode($iv . $encrypted);
         }
 
         public function decrypt($data)
@@ -69,20 +69,52 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Crypto')) {
                 return $data;
             }
 
-            // Check signature to see if it's actually encrypted by us and not a legacy log
-            if (strpos($data, 'FLENC:') !== 0) {
-                return $data;
+            // v2 format: OPENSSL_RAW_DATA, single base64
+            if (strpos($data, 'FLENC2:') === 0) {
+                return $this->decrypt_v2(substr($data, 7));
             }
 
-            $payload = substr($data, 6);
-            $decoded = base64_decode($payload);
+            // v1 legacy format: flag 0 (base64 ciphertext), double base64
+            if (strpos($data, 'FLENC:') === 0) {
+                return $this->decrypt_v1(substr($data, 6));
+            }
+
+            return $data;
+        }
+
+        private function decrypt_v2($payload)
+        {
+            $decoded = base64_decode($payload, true);
             if ($decoded === false) {
-                return $data;
+                return 'FLENC2:' . $payload;
             }
 
             $iv_length = openssl_cipher_iv_length(self::METHOD);
             if ($iv_length === false || strlen($decoded) <= $iv_length) {
-                return $data;
+                return 'FLENC2:' . $payload;
+            }
+
+            $iv = substr($decoded, 0, $iv_length);
+            $encrypted = substr($decoded, $iv_length);
+
+            $decrypted = openssl_decrypt($encrypted, self::METHOD, $this->key, OPENSSL_RAW_DATA, $iv);
+            if ($decrypted === false) {
+                return 'FLENC2:' . $payload;
+            }
+
+            return $decrypted;
+        }
+
+        private function decrypt_v1($payload)
+        {
+            $decoded = base64_decode($payload, true);
+            if ($decoded === false) {
+                return 'FLENC:' . $payload;
+            }
+
+            $iv_length = openssl_cipher_iv_length(self::METHOD);
+            if ($iv_length === false || strlen($decoded) <= $iv_length) {
+                return 'FLENC:' . $payload;
             }
 
             $iv = substr($decoded, 0, $iv_length);
@@ -90,7 +122,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Crypto')) {
 
             $decrypted = openssl_decrypt($encrypted, self::METHOD, $this->key, 0, $iv);
             if ($decrypted === false) {
-                return $data; // decryption failed, maybe key changed
+                return 'FLENC:' . $payload;
             }
 
             return $decrypted;
