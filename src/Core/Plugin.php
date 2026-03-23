@@ -43,6 +43,9 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         /** @var Crypto */
         private $crypto;
 
+        /** @var Notifier */
+        private $notifier;
+
         public static function instance()
         {
             if (self::$instance === null) {
@@ -55,6 +58,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         private function __construct()
         {
             $this->crypto = new Crypto();
+            $this->notifier = new Notifier();
             $this->context = new RequestContext(self::REQUEST_FIELD);
             $this->storage = new LogStorage($this->crypto);
             $this->mail_logger = new MailLogger($this->storage, $this->context);
@@ -69,6 +73,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         {
             add_action('init', array($this, 'schedule_cleanup_event'));
             add_action('init', array($this, 'check_ip_block'), 1);
+            add_action('fl_log_written', array($this->notifier, 'maybe_notify'));
             add_action(self::CRON_HOOK, array($this, 'run_cleanup'));
 
             add_filter('wp_mail', array($this->mail_logger, 'log_mail_pre_send'), 10, 1);
@@ -107,8 +112,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         {
             global $pagenow;
 
-            // Do not block admin dashboard, login page, or logged-in administrators
-            if (is_admin() || $pagenow === 'wp-login.php' || current_user_can('manage_options')) {
+            // Do not block admin dashboard (but not AJAX), login page, or logged-in administrators
+            if ((is_admin() && !wp_doing_ajax()) || $pagenow === 'wp-login.php' || current_user_can('manage_options')) {
                 return;
             }
 
@@ -288,11 +293,12 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
         public function register_yootheme_events()
         {
             if (class_exists('\\YOOtheme\\Event')) {
-                \YOOtheme\Event::on('form.submission', function ($response, $request = null) {
-                    $args = array();
-                    if ($request && method_exists($request, 'toArray')) {
-                        $args['request'] = $request->toArray();
+                \YOOtheme\Event::on('form.submission', function ($response, $next = null) {
+                    if (is_callable($next)) {
+                        $response = $next($response);
                     }
+
+                    $args = array();
                     if ($response && method_exists($response, 'toArray')) {
                         $args['response'] = $response->toArray();
                     }
@@ -317,6 +323,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
                     ),
                         $this->context
                     );
+
                     return $response;
                 });
             }

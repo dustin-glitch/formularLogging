@@ -52,6 +52,15 @@ if (!class_exists('Signalfeuer\FormularLogs\Loggers\AjaxLogger')) {
                 \Signalfeuer\FormularLogs\Core\Plugin::instance()->track_ip_error();
             }
 
+            $max_field_size = 65536; // 64 KB per JSON field
+            $payload_raw = $this->context->read_raw_post_field('payload_json');
+            $attachments_raw = $this->context->read_raw_post_field('attachments_json');
+            $extra_raw = $this->context->read_raw_post_field('extra_json');
+
+            if (strlen($payload_raw) > $max_field_size || strlen($attachments_raw) > $max_field_size || strlen($extra_raw) > $max_field_size) {
+                wp_send_json_error(array('message' => 'Payload too large'), 413);
+            }
+
             $ok = $this->storage->write_log(
                 array(
                 'request_id' => $request_id,
@@ -63,9 +72,9 @@ if (!class_exists('Signalfeuer\FormularLogs\Loggers\AjaxLogger')) {
                 'page_url' => isset($_POST['page_url']) ? esc_url_raw(wp_unslash($_POST['page_url'])) : $this->context->get_page_url(),
                 'browser' => isset($_POST['browser']) ? sanitize_text_field(wp_unslash($_POST['browser'])) : '',
                 'os' => isset($_POST['os']) ? sanitize_text_field(wp_unslash($_POST['os'])) : '',
-                'payload_json' => $this->context->ensure_json_string($this->context->read_raw_post_field('payload_json')),
-                'attachments_json' => $this->context->ensure_json_string($this->context->read_raw_post_field('attachments_json')),
-                'extra_json' => $this->context->ensure_json_string($this->context->read_raw_post_field('extra_json')),
+                'payload_json' => $this->context->ensure_json_string($payload_raw),
+                'attachments_json' => $this->context->ensure_json_string($attachments_raw),
+                'extra_json' => $this->context->ensure_json_string($extra_raw),
             ),
                 $this->context
             );

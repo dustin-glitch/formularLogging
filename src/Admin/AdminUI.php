@@ -80,7 +80,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
                 wp_enqueue_script(
                     'chart-js',
-                    'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+                    FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/js/chart.umd.min.js',
                     array(),
                     '4.4.1',
                     true
@@ -186,6 +186,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 echo esc_html($log_dir);
                 echo '</p></div>';
             }
+
         }
 
         public function render_admin_page()
@@ -194,31 +195,56 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 return;
             }
 
-            $date = isset($_GET['date']) ? sanitize_text_field(wp_unslash($_GET['date'])) : wp_date('Y-m-d');
-            if (!$this->is_valid_date($date)) {
-                $date = wp_date('Y-m-d');
+            $per_page = 25; // groups per page
+            $today = wp_date('Y-m-d');
+
+            // Support legacy ?date= param as fallback for date_from
+            $legacy_date = isset($_GET['date']) ? sanitize_text_field(wp_unslash($_GET['date'])) : '';
+
+            $date_from = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : $legacy_date;
+            $date_to   = isset($_GET['date_to'])   ? sanitize_text_field(wp_unslash($_GET['date_to']))   : '';
+
+            if (!$this->is_valid_date($date_from)) {
+                $date_from = $today;
+            }
+            if (!$this->is_valid_date($date_to) || $date_to < $date_from) {
+                $date_to = $date_from;
             }
 
+            // Limit range to 14 days
+            $date_from_ts = strtotime($date_from);
+            $date_to_ts   = min(strtotime($date_to), $date_from_ts + 13 * DAY_IN_SECONDS);
+            $date_to      = wp_date('Y-m-d', $date_to_ts);
+
             $request_id = isset($_GET['request_id']) ? sanitize_text_field(wp_unslash($_GET['request_id'])) : '';
-            $status = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
+            $status     = isset($_GET['status'])     ? sanitize_text_field(wp_unslash($_GET['status']))     : '';
             $event_type = isset($_GET['event_type']) ? sanitize_text_field(wp_unslash($_GET['event_type'])) : '';
+            $paged      = isset($_GET['paged'])      ? max(1, (int)$_GET['paged'])                         : 1;
 
-            $path = $this->storage->get_daily_log_path($date);
-            $rows = $this->storage->read_filtered_rows(
-                $path,
-                array(
+            // Collect rows from all days in range
+            $filters = array(
                 'request_id' => $request_id,
-                'status' => $status,
+                'status'     => $status,
                 'event_type' => $event_type,
-            ),
-                200
             );
+            $rows    = array();
+            $current = $date_from_ts;
+            while ($current <= $date_to_ts && count($rows) < 5000) {
+                $date_str = wp_date('Y-m-d', $current);
+                $path     = $this->storage->get_daily_log_path($date_str);
+                if (file_exists($path)) {
+                    $daily = $this->storage->read_filtered_rows($path, $filters, 5000);
+                    $rows  = array_merge($rows, $daily);
+                }
+                $current += DAY_IN_SECONDS;
+            }
 
+            // CSV download uses date_from only
             $download_url = wp_nonce_url(
                 add_query_arg(
                 array(
-                'page' => 'formular-logs',
-                'date' => $date,
+                'page'        => 'formular-logs',
+                'date'        => $date_from,
                 'fl_download' => '1',
             ),
                 admin_url('admin.php')
@@ -246,8 +272,10 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             echo '<h1>Formular Logs</h1>';
             echo '<form method="get" class="sf-filter-form">';
             echo '<input type="hidden" name="page" value="formular-logs" />';
-            echo '<div><label for="fl-date">Datum: </label>';
-            echo '<input type="date" id="fl-date" name="date" value="' . esc_attr($date) . '" /></div>';
+            echo '<div><label for="fl-date-from">Von: </label>';
+            echo '<input type="date" id="fl-date-from" name="date_from" value="' . esc_attr($date_from) . '" /></div>';
+            echo '<div><label for="fl-date-to">Bis: </label>';
+            echo '<input type="date" id="fl-date-to" name="date_to" value="' . esc_attr($date_to) . '" /> <span style="color:#646970; font-size:12px;">(max. 14 Tage)</span></div>';
             echo '<div><label for="fl-request-id">Request ID: </label>';
             echo '<input type="text" id="fl-request-id" name="request_id" value="' . esc_attr($request_id) . '" /></div>';
             echo '<div><label for="fl-status">Status: </label>';
@@ -272,10 +300,68 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             echo '</div>';
             echo '</form>';
 
-            if (!file_exists($path)) {
-                echo '<p>Keine Log-Datei gefunden fuer ' . esc_html($date) . '.</p>';
+            // Build all groups from rows
+            $all_grouped = array();
+            foreach ($rows as $row) {
+                $req = isset($row['request_id']) && $row['request_id'] !== '' ? $row['request_id'] : 'unknown_' . uniqid();
+                if (!isset($all_grouped[$req])) {
+                    $all_grouped[$req] = array('rows' => array(), 'level' => -1, 'badge' => '', 'time' => '');
+                }
+                $all_grouped[$req]['rows'][] = $row;
+
+                if (empty($all_grouped[$req]['time']) && !empty($row['timestamp_utc'])) {
+                    $all_grouped[$req]['time'] = $row['timestamp_utc'];
+                }
+
+                $badgeHtml = $this->classify_problem($row);
+                $level = 1;
+                if (strpos($badgeHtml, 'JS Fehler') !== false || strpos($badgeHtml, 'System-/Mailerfehler') !== false) {
+                    $level = 3;
+                }
+                elseif (strpos($badgeHtml, 'Nutzer/Validierung') !== false) {
+                    $level = 2;
+                }
+                elseif (strpos($badgeHtml, 'Erfolgreich / Info') !== false) {
+                    $level = 0;
+                }
+
+                if ($level > $all_grouped[$req]['level']) {
+                    $all_grouped[$req]['level'] = $level;
+                    $all_grouped[$req]['badge'] = $badgeHtml;
+                }
+            }
+
+            $all_grouped = array_reverse($all_grouped, true);
+            $total_groups = count($all_grouped);
+            $total_pages = $total_groups > 0 ? (int)ceil($total_groups / $per_page) : 1;
+            $paged = min($paged, $total_pages);
+            $offset = ($paged - 1) * $per_page;
+            $grouped = array_slice($all_grouped, $offset, $per_page, true);
+
+            $visible_cols = count(array_filter($empty_columns, function ($isEmpty) {
+                return !$isEmpty;
+            })) + 1;
+
+            // Pagination helper
+            $pagination_base = add_query_arg(array(
+                'page'       => 'formular-logs',
+                'date_from'  => $date_from,
+                'date_to'    => $date_to,
+                'request_id' => $request_id,
+                'status'     => $status,
+                'event_type' => $event_type,
+            ), admin_url('admin.php'));
+
+            if ($total_groups > 0) {
+                echo '<div class="sf-pagination" style="margin:10px 0; display:flex; align-items:center; gap:8px;">';
+                echo '<span>' . esc_html($total_groups) . ' Anfragen &mdash; Seite ' . esc_html($paged) . ' von ' . esc_html($total_pages) . '</span>';
+                if ($paged > 1) {
+                    echo ' <a class="button" href="' . esc_url(add_query_arg('paged', $paged - 1, $pagination_base)) . '">&laquo; Zurück</a>';
+                }
+                if ($paged < $total_pages) {
+                    echo ' <a class="button" href="' . esc_url(add_query_arg('paged', $paged + 1, $pagination_base)) . '">Weiter &raquo;</a>';
+                }
                 echo '</div>';
-                return;
             }
 
             echo '<table class="sf-table">';
@@ -289,49 +375,10 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             }
             echo '</tr></thead><tbody>';
 
-            if (empty($rows)) {
-                $visible_cols = count(array_filter($empty_columns, function ($isEmpty) {
-                    return !$isEmpty;
-                })) + 1;
+            if (empty($all_grouped)) {
                 echo '<tr><td colspan="' . esc_attr($visible_cols) . '">Keine passenden Eintraege.</td></tr>';
             }
             else {
-                $grouped = array();
-                foreach ($rows as $row) {
-                    $req = isset($row['request_id']) && $row['request_id'] !== '' ? $row['request_id'] : 'unknown_' . uniqid();
-                    if (!isset($grouped[$req])) {
-                        $grouped[$req] = array('rows' => array(), 'level' => -1, 'badge' => '', 'time' => '');
-                    }
-                    $grouped[$req]['rows'][] = $row;
-
-                    if (empty($grouped[$req]['time']) && !empty($row['timestamp'])) {
-                        $grouped[$req]['time'] = $row['timestamp'];
-                    }
-
-                    $badgeHtml = $this->classify_problem($row);
-                    $level = 1;
-                    if (strpos($badgeHtml, 'JS Fehler') !== false || strpos($badgeHtml, 'System-/Mailerfehler') !== false) {
-                        $level = 3;
-                    }
-                    elseif (strpos($badgeHtml, 'Nutzer/Validierungsfehler') !== false) {
-                        $level = 2;
-                    }
-                    elseif (strpos($badgeHtml, 'Erfolgreich / Info') !== false) {
-                        $level = 0;
-                    }
-
-                    if ($level > $grouped[$req]['level']) {
-                        $grouped[$req]['level'] = $level;
-                        $grouped[$req]['badge'] = $badgeHtml;
-                    }
-                }
-
-                $visible_cols = count(array_filter($empty_columns, function ($isEmpty) {
-                    return !$isEmpty;
-                })) + 1;
-
-                $grouped = array_reverse($grouped, true);
-
                 $group_idx = 0;
                 foreach ($grouped as $req_id => $group) {
                     $bg_color = ($group_idx % 2 === 0) ? '#ffffff' : '#f6f7f7';
@@ -372,6 +419,19 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             }
 
             echo '</tbody></table>';
+
+            // Bottom pagination
+            if ($total_pages > 1) {
+                echo '<div class="sf-pagination" style="margin:10px 0; display:flex; align-items:center; gap:8px;">';
+                if ($paged > 1) {
+                    echo '<a class="button" href="' . esc_url(add_query_arg('paged', $paged - 1, $pagination_base)) . '">&laquo; Zurück</a>';
+                }
+                echo '<span>Seite ' . esc_html($paged) . ' von ' . esc_html($total_pages) . '</span>';
+                if ($paged < $total_pages) {
+                    echo '<a class="button" href="' . esc_url(add_query_arg('paged', $paged + 1, $pagination_base)) . '">Weiter &raquo;</a>';
+                }
+                echo '</div>';
+            }
 
 ?>
 <div id="fl-json-modal" class="sf-modal">

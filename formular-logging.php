@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Formular Logging
- * Plugin URI: https://example.com/
+ * Plugin URI: https://github.com/dustin-glitch/formularLogging
  * Description: End-to-end logging for form submissions and mail delivery into daily CSV files.
  * Version: 1.2.0
  * Author: Dustin
@@ -59,7 +59,13 @@ Plugin::instance();
 // -----------------------------------------------------------------------------
 // Update Checker Configuration
 // -----------------------------------------------------------------------------
-$fl_github_token = trim(get_option('fl_github_update_token', ''));
+// Token priority: wp-config.php constant > database option (Admin-UI)
+// Recommended: define('FL_GITHUB_UPDATE_TOKEN', 'ghp_...') in wp-config.php
+if (defined('FL_GITHUB_UPDATE_TOKEN') && FL_GITHUB_UPDATE_TOKEN !== '') {
+    $fl_github_token = FL_GITHUB_UPDATE_TOKEN;
+} else {
+    $fl_github_token = trim(get_option('fl_github_update_token', ''));
+}
 
 $flUpdateChecker = PucFactory::buildUpdateChecker(
     'https://github.com/dustin-glitch/formularLogging',

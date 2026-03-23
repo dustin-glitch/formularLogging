@@ -163,6 +163,86 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 'fl_pages_section'
             );
 
+            // Notification settings
+            register_setting(
+                self::SETTINGS_GROUP,
+                'fl_notify_enabled',
+                array(
+                'type' => 'boolean',
+                'sanitize_callback' => 'rest_sanitize_boolean',
+                'default' => false,
+            )
+            );
+
+            register_setting(
+                self::SETTINGS_GROUP,
+                'fl_notify_email',
+                array(
+                'type' => 'string',
+                'sanitize_callback' => array($this, 'sanitize_notify_email'),
+                'default' => '',
+            )
+            );
+
+            register_setting(
+                self::SETTINGS_GROUP,
+                'fl_notify_slack_webhook',
+                array(
+                'type' => 'string',
+                'sanitize_callback' => 'esc_url_raw',
+                'default' => '',
+            )
+            );
+
+            register_setting(
+                self::SETTINGS_GROUP,
+                'fl_notify_cooldown',
+                array(
+                'type' => 'number',
+                'sanitize_callback' => array($this, 'sanitize_notify_cooldown'),
+                'default' => 15,
+            )
+            );
+
+            add_settings_section(
+                'fl_notify_section',
+                'Fehler-Benachrichtigungen',
+                array($this, 'render_notify_description'),
+                self::PAGE_SLUG
+            );
+
+            add_settings_field(
+                'fl_notify_enabled',
+                'Benachrichtigungen aktivieren',
+                array($this, 'render_notify_enabled_field'),
+                self::PAGE_SLUG,
+                'fl_notify_section'
+            );
+
+            add_settings_field(
+                'fl_notify_email',
+                'E-Mail-Empfänger (eine pro Zeile)',
+                array($this, 'render_notify_email_field'),
+                self::PAGE_SLUG,
+                'fl_notify_section'
+            );
+
+            add_settings_field(
+                'fl_notify_slack_webhook',
+                'Slack Webhook URL',
+                array($this, 'render_notify_slack_field'),
+                self::PAGE_SLUG,
+                'fl_notify_section'
+            );
+
+            add_settings_field(
+                'fl_notify_cooldown',
+                'Cooldown (Minuten)',
+                array($this, 'render_notify_cooldown_field'),
+                self::PAGE_SLUG,
+                'fl_notify_section'
+            );
+
             add_settings_section(
                 'fl_rate_limit_section',
                 'Rate Limiting & Sicherheit',
@@ -298,10 +378,17 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
 
         public function render_github_token_field()
         {
+            if (defined('FL_GITHUB_UPDATE_TOKEN') && FL_GITHUB_UPDATE_TOKEN !== '') {
+                echo '<input type="password" class="regular-text" value="••••••••••••••••" disabled />';
+                echo '<p class="description" style="color:#2271b1;"><strong>Token wird aus der <code>wp-config.php</code> geladen</strong> (Konstante <code>FL_GITHUB_UPDATE_TOKEN</code>). Das Feld hier wird ignoriert.</p>';
+                return;
+            }
+
             $value = (string)get_option('fl_github_update_token', '');
 
             echo '<input type="password" name="fl_github_update_token" value="' . esc_attr($value) . '" class="regular-text" />';
-            echo '<p class="description">Falls dieses Plugin in einem privaten GitHub Repository liegt, füge hier deinen <a href="https://github.com/settings/tokens" target="_blank">Personal Access Token (classic)</a> mit dem <code>repo</code> Scope ein, damit automatische Updates installiert werden können.</p>';
+            echo '<p class="description">Falls dieses Plugin in einem privaten GitHub Repository liegt, füge hier deinen <a href="https://github.com/settings/tokens" target="_blank">Personal Access Token (classic)</a> mit dem <code>repo</code> Scope ein, damit automatische Updates installiert werden können.<br>';
+            echo '<strong>Sicherer:</strong> Token als Konstante in der <code>wp-config.php</code> definieren: <code>define(\'FL_GITHUB_UPDATE_TOKEN\', \'ghp_...\');</code></p>';
         }
 
         public function render_custom_log_dir_field()
@@ -475,6 +562,63 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
             $path = untrailingslashit((string)$path);
 
             return $path === '' ? '/' : $path;
+        }
+
+        // ---------------------------------------------------------------
+        // Notification render methods
+        // ---------------------------------------------------------------
+
+        public function render_notify_description()
+        {
+            echo '<p>Sende eine Benachrichtigung per E-Mail und/oder Slack, wenn ein kritischer System- oder Mailfehler geloggt wird. Nutzer-/Validierungsfehler und Captcha-Fehler lösen <strong>keinen</strong> Alert aus. Ein Cooldown verhindert Benachrichtigungs-Spam bei mehreren Fehlern in kurzer Zeit.</p>';
+        }
+
+        public function render_notify_enabled_field()
+        {
+            $value = get_option('fl_notify_enabled', false);
+            echo '<input type="checkbox" name="fl_notify_enabled" value="1" ' . checked($value, true, false) . ' />';
+            echo ' <label for="fl_notify_enabled">Fehler-Benachrichtigungen aktivieren</label>';
+        }
+
+        public function render_notify_email_field()
+        {
+            $value = (string) get_option('fl_notify_email', '');
+            echo '<textarea name="fl_notify_email" rows="4" cols="50" class="large-text code">' . esc_textarea($value) . '</textarea>';
+            echo '<p class="description">Eine E-Mail-Adresse pro Zeile. Alle eingetragenen Adressen erhalten die Benachrichtigung.</p>';
+        }
+
+        public function render_notify_slack_field()
+        {
+            $value = (string) get_option('fl_notify_slack_webhook', '');
+            echo '<input type="url" name="fl_notify_slack_webhook" value="' . esc_attr($value) . '" class="regular-text" placeholder="https://hooks.slack.com/services/..." />';
+            echo '<p class="description">Slack Incoming Webhook URL. Den Webhook in deinem Slack-Workspace unter <em>Apps → Incoming Webhooks</em> anlegen.</p>';
+        }
+
+        public function render_notify_cooldown_field()
+        {
+            $value = max(1, (int) get_option('fl_notify_cooldown', 15));
+            echo '<input type="number" name="fl_notify_cooldown" value="' . esc_attr((string) $value) . '" class="small-text" style="width:80px;" min="1" />';
+            echo '<p class="description">Mindestabstand zwischen zwei Benachrichtigungen in Minuten (Standard: 15). Verhindert Benachrichtigungs-Spam bei vielen Fehlern hintereinander.</p>';
+        }
+
+        public function sanitize_notify_email($value)
+        {
+            $value = is_scalar($value) ? (string) $value : '';
+            $lines = preg_split('/\r\n|\r|\n/', $value);
+            $clean = array();
+            foreach ((array) $lines as $line) {
+                $addr = sanitize_email(trim((string) $line));
+                if ($addr !== '') {
+                    $clean[] = $addr;
+                }
+            }
+            return implode(PHP_EOL, $clean);
+        }
+
+        public function sanitize_notify_cooldown($value)
+        {
+            $v = (int) $value;
+            return $v >= 1 ? $v : 15;
         }
     }
 }

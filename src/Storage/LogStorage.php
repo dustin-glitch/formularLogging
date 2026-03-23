@@ -109,6 +109,9 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
 
             flock($handle, LOCK_UN);
             fclose($handle);
+
+            do_action('fl_log_written', $row);
+
             return true;
         }
 
@@ -144,6 +147,12 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
 
         public function get_aggregated_stats_for_last_days($days = 7)
         {
+            $cache_key = 'fl_stats_' . (int)$days . '_' . wp_date('Y-m-d-H');
+            $cached = get_transient($cache_key);
+            if ($cached !== false && is_array($cached)) {
+                return $cached;
+            }
+
             $stats = array(
                 'labels' => array(),
                 'success' => array(),
@@ -200,6 +209,9 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 $stats['errors'][] = $errors;
             }
 
+            // Cache for 1 hour (keyed by date+hour, so it auto-expires each hour)
+            set_transient($cache_key, $stats, HOUR_IN_SECONDS);
+
             return $stats;
         }
 
@@ -241,7 +253,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 }
 
                 $rows[] = $assoc;
-                if (count($rows) > $limit) {
+                // When no filters are active, stop after $limit rows to avoid loading the full file
+                if (empty($filters['request_id']) && empty($filters['status']) && empty($filters['event_type'])) {
+                    if (count($rows) >= $limit) {
+                        break;
+                    }
+                }
+                elseif (count($rows) > $limit) {
+                    // With filters: keep a sliding window of the last $limit matching rows
                     array_shift($rows);
                 }
             }
@@ -265,7 +284,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                 @file_put_contents($indexFile, '<?php' . PHP_EOL . '// Silence is golden.' . PHP_EOL);
             }
 
-            // Create restrictive .htaccess
+            // Create restrictive .htaccess (Apache only — Nginx ignores this file)
+            // On Nginx servers, configure the web server to deny access to this directory directly.
             $htaccessFile = trailingslashit($log_dir) . '.htaccess';
             if (!file_exists($htaccessFile)) {
                 $htaccessRules = "Deny from all\n<Files \"*\">\n\tOrder allow,deny\n\tDeny from all\n</Files>\n";
@@ -318,6 +338,10 @@ if (!class_exists('Signalfeuer\FormularLogs\Storage\LogStorage')) {
                     $ordered[] = $this->crypto->encrypt($scalar_val);
                 }
                 else {
+                    // Prevent CSV/formula injection when opened in Excel or LibreOffice
+                    if ($scalar_val !== '' && preg_match('/^[=+\-@\t\r]/', $scalar_val)) {
+                        $scalar_val = "'" . $scalar_val;
+                    }
                     $ordered[] = $scalar_val;
                 }
             }
