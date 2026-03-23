@@ -1315,6 +1315,29 @@
     line-height: 1.5;
 }
 
+/* About: update row */
+.sf-about-update-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 22px;
+}
+
+.sf-about-update-row .sf-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    flex-shrink: 0;
+    font-size: 13px;
+}
+
+.sf-about-update-row .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+}
+
 /* System check rows */
 .sf-syscheck {
     display: flex;

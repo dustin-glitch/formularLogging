@@ -754,17 +754,14 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                                 </div>
                             </div>
                             <div class="sf-card-body">
-                                <div class="sf-setting-row sf-setting-row--last">
-                                    <div class="sf-setting-label">
-                                        <label>Installierte Version</label>
-                                        <span class="sf-setting-hint">Branch: <code>main</code></span>
-                                    </div>
-                                    <div class="sf-setting-input sf-setting-inline">
+                                <div class="sf-about-update-row">
+                                    <div>
                                         <span class="sf-version-badge">v<?php echo esc_html($version); ?></span>
-                                        <a href="<?php echo esc_url($force_url); ?>" class="sf-btn-secondary">
-                                            <span class="dashicons dashicons-update"></span> Jetzt prüfen
-                                        </a>
+                                        <span class="sf-hint" style="margin-top:4px;">Branch: <code>main</code></span>
                                     </div>
+                                    <a href="<?php echo esc_url($force_url); ?>" class="sf-btn-secondary">
+                                        <span class="dashicons dashicons-update"></span> Jetzt prüfen
+                                    </a>
                                 </div>
                             </div>
                         </div>
