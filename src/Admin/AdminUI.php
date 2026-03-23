@@ -189,29 +189,76 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         }
 
+        /** Human-readable column labels */
+        private $column_labels = array(
+            'timestamp_utc'   => 'Zeitstempel',
+            'request_id'      => 'Request-ID',
+            'event_type'      => 'Typ',
+            'event_stage'     => 'Stage',
+            'status'          => 'Status',
+            'source'          => 'Quelle',
+            'form_identifier' => 'Formular',
+            'page_url'        => 'Seite',
+            'http_method'     => 'Methode',
+            'client_ip'       => 'IP',
+            'user_agent'      => 'User Agent',
+            'browser'         => 'Browser',
+            'os'              => 'OS',
+            'recipient'       => 'Empfänger',
+            'subject'         => 'Betreff',
+            'mailer'          => 'Mailer',
+            'smtp_host'       => 'SMTP Host',
+            'smtp_port'       => 'SMTP Port',
+            'error_code'      => 'Fehlercode',
+            'error_message'   => 'Fehlermeldung',
+            'payload_json'    => 'Payload',
+            'attachments_json'=> 'Anhänge',
+            'extra_json'      => 'Extra',
+        );
+
+        /** Short request ID: first 8 chars */
+        private function short_id($req_id)
+        {
+            return strpos($req_id, 'unknown_') === 0 ? '–' : substr($req_id, 0, 8) . '…';
+        }
+
+        /** Format ISO timestamp to readable local time */
+        private function format_time($ts)
+        {
+            if ($ts === '') return '';
+            $t = strtotime($ts);
+            return $t ? wp_date('d.m.Y · H:i:s', $t) : esc_html($ts);
+        }
+
+        /** Status dot class */
+        private function status_dot_class($status)
+        {
+            switch ($status) {
+                case 'success': return 'sf-dot--success';
+                case 'error':   return 'sf-dot--error';
+                case 'failed':  return 'sf-dot--error';
+                case 'info':    return 'sf-dot--info';
+                case 'started': return 'sf-dot--started';
+                default:        return 'sf-dot--unknown';
+            }
+        }
+
         public function render_admin_page()
         {
             if (!current_user_can('manage_options')) {
                 return;
             }
 
-            $per_page = 25; // groups per page
-            $today = wp_date('Y-m-d');
+            $per_page = 25;
+            $today    = wp_date('Y-m-d');
 
-            // Support legacy ?date= param as fallback for date_from
             $legacy_date = isset($_GET['date']) ? sanitize_text_field(wp_unslash($_GET['date'])) : '';
+            $date_from   = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : $legacy_date;
+            $date_to     = isset($_GET['date_to'])   ? sanitize_text_field(wp_unslash($_GET['date_to']))   : '';
 
-            $date_from = isset($_GET['date_from']) ? sanitize_text_field(wp_unslash($_GET['date_from'])) : $legacy_date;
-            $date_to   = isset($_GET['date_to'])   ? sanitize_text_field(wp_unslash($_GET['date_to']))   : '';
+            if (!$this->is_valid_date($date_from)) $date_from = $today;
+            if (!$this->is_valid_date($date_to) || $date_to < $date_from) $date_to = $date_from;
 
-            if (!$this->is_valid_date($date_from)) {
-                $date_from = $today;
-            }
-            if (!$this->is_valid_date($date_to) || $date_to < $date_from) {
-                $date_to = $date_from;
-            }
-
-            // Limit range to 14 days
             $date_from_ts = strtotime($date_from);
             $date_to_ts   = min(strtotime($date_to), $date_from_ts + 13 * DAY_IN_SECONDS);
             $date_to      = wp_date('Y-m-d', $date_to_ts);
@@ -221,230 +268,288 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             $event_type = isset($_GET['event_type']) ? sanitize_text_field(wp_unslash($_GET['event_type'])) : '';
             $paged      = isset($_GET['paged'])      ? max(1, (int)$_GET['paged'])                         : 1;
 
-            // Collect rows from all days in range
-            $filters = array(
-                'request_id' => $request_id,
-                'status'     => $status,
-                'event_type' => $event_type,
-            );
+            $filters = array('request_id' => $request_id, 'status' => $status, 'event_type' => $event_type);
             $rows    = array();
             $current = $date_from_ts;
             while ($current <= $date_to_ts && count($rows) < 5000) {
                 $date_str = wp_date('Y-m-d', $current);
                 $path     = $this->storage->get_daily_log_path($date_str);
                 if (file_exists($path)) {
-                    $daily = $this->storage->read_filtered_rows($path, $filters, 5000);
-                    $rows  = array_merge($rows, $daily);
+                    $rows = array_merge($rows, $this->storage->read_filtered_rows($path, $filters, 5000));
                 }
                 $current += DAY_IN_SECONDS;
             }
 
-            // CSV download uses date_from only
-            $download_url = wp_nonce_url(
-                add_query_arg(
-                array(
-                'page'        => 'formular-logs',
-                'date'        => $date_from,
-                'fl_download' => '1',
-            ),
+            $download_url = wp_nonce_url(add_query_arg(
+                array('page' => 'formular-logs', 'date' => $date_from, 'fl_download' => '1'),
                 admin_url('admin.php')
-            ),
-                'fl_download_csv'
-            );
+            ), 'fl_download_csv');
 
-            $columns = $this->storage->get_columns();
-
-            $empty_columns = array();
-            foreach ($columns as $column) {
-                $empty_columns[$column] = true;
-                if (!empty($rows)) {
-                    foreach ($rows as $row) {
-                        $val = isset($row[$column]) ? (string)$row[$column] : '';
-                        if ($val !== '') {
-                            $empty_columns[$column] = false;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            echo '<div class="wrap sf-wrap">';
-            echo '<h1>Formular Logs</h1>';
-            echo '<form method="get" class="sf-filter-form">';
-            echo '<input type="hidden" name="page" value="formular-logs" />';
-            echo '<div><label for="fl-date-from">Von: </label>';
-            echo '<input type="date" id="fl-date-from" name="date_from" value="' . esc_attr($date_from) . '" /></div>';
-            echo '<div><label for="fl-date-to">Bis: </label>';
-            echo '<input type="date" id="fl-date-to" name="date_to" value="' . esc_attr($date_to) . '" /> <span style="color:#646970; font-size:12px;">(max. 14 Tage)</span></div>';
-            echo '<div><label for="fl-request-id">Request ID: </label>';
-            echo '<input type="text" id="fl-request-id" name="request_id" value="' . esc_attr($request_id) . '" /></div>';
-            echo '<div><label for="fl-status">Status: </label>';
-            echo '<input type="text" id="fl-status" name="status" value="' . esc_attr($status) . '" /></div>';
-            echo '<div><label for="fl-event-type">Event Type: </label>';
-            echo '<input type="text" id="fl-event-type" name="event_type" value="' . esc_attr($event_type) . '" /></div>';
-            $cleanup_url = wp_nonce_url(
-                add_query_arg(
-                array(
-                'page' => 'formular-logs',
-                'fl_cleanup' => '1',
-            ),
+            $cleanup_url = wp_nonce_url(add_query_arg(
+                array('page' => 'formular-logs', 'fl_cleanup' => '1'),
                 admin_url('admin.php')
-            ),
-                'fl_manual_cleanup'
-            );
+            ), 'fl_manual_cleanup');
 
-            echo '<div>';
-            submit_button('Filter anwenden', '', '', false, array('class' => 'sf-btn-primary'));
-            echo ' <a class="sf-btn-secondary" href="' . esc_url($download_url) . '">CSV herunterladen</a>';
-            echo ' <a class="sf-btn-secondary" href="' . esc_url($cleanup_url) . '" onclick="return confirm(\'Veraltete Logs (gemäß Einstellung) jetzt unwiderruflich löschen?\');">Logs bereinigen</a>';
-            echo '</div>';
-            echo '</form>';
+            $pagination_base = add_query_arg(array(
+                'page' => 'formular-logs', 'date_from' => $date_from, 'date_to' => $date_to,
+                'request_id' => $request_id, 'status' => $status, 'event_type' => $event_type,
+            ), admin_url('admin.php'));
 
-            // Build all groups from rows
+            // Build groups
             $all_grouped = array();
             foreach ($rows as $row) {
                 $req = isset($row['request_id']) && $row['request_id'] !== '' ? $row['request_id'] : 'unknown_' . uniqid();
                 if (!isset($all_grouped[$req])) {
-                    $all_grouped[$req] = array('rows' => array(), 'level' => -1, 'badge' => '', 'time' => '');
+                    $all_grouped[$req] = array('rows' => array(), 'level' => -1, 'badge' => '', 'time' => '', 'page' => '', 'form' => '');
                 }
                 $all_grouped[$req]['rows'][] = $row;
-
                 if (empty($all_grouped[$req]['time']) && !empty($row['timestamp_utc'])) {
                     $all_grouped[$req]['time'] = $row['timestamp_utc'];
+                }
+                if (empty($all_grouped[$req]['page']) && !empty($row['page_url'])) {
+                    $all_grouped[$req]['page'] = $row['page_url'];
+                }
+                if (empty($all_grouped[$req]['form']) && !empty($row['form_identifier'])) {
+                    $all_grouped[$req]['form'] = $row['form_identifier'];
                 }
 
                 $badgeHtml = $this->classify_problem($row);
                 $level = 1;
                 if (strpos($badgeHtml, 'JS Fehler') !== false || strpos($badgeHtml, 'System-/Mailerfehler') !== false) {
                     $level = 3;
-                }
-                elseif (strpos($badgeHtml, 'Nutzer/Validierung') !== false) {
+                } elseif (strpos($badgeHtml, 'Nutzer/Validierung') !== false) {
                     $level = 2;
-                }
-                elseif (strpos($badgeHtml, 'Erfolgreich / Info') !== false) {
+                } elseif (strpos($badgeHtml, 'Erfolgreich / Info') !== false) {
                     $level = 0;
                 }
-
                 if ($level > $all_grouped[$req]['level']) {
                     $all_grouped[$req]['level'] = $level;
                     $all_grouped[$req]['badge'] = $badgeHtml;
                 }
             }
 
-            $all_grouped = array_reverse($all_grouped, true);
+            $all_grouped  = array_reverse($all_grouped, true);
             $total_groups = count($all_grouped);
-            $total_pages = $total_groups > 0 ? (int)ceil($total_groups / $per_page) : 1;
-            $paged = min($paged, $total_pages);
-            $offset = ($paged - 1) * $per_page;
-            $grouped = array_slice($all_grouped, $offset, $per_page, true);
+            $total_pages  = $total_groups > 0 ? (int)ceil($total_groups / $per_page) : 1;
+            $paged        = min($paged, $total_pages);
+            $grouped      = array_slice($all_grouped, ($paged - 1) * $per_page, $per_page, true);
 
-            $visible_cols = count(array_filter($empty_columns, function ($isEmpty) {
-                return !$isEmpty;
-            })) + 1;
+            $status_options = array(
+                ''        => 'Alle Status',
+                'success' => 'Erfolgreich',
+                'error'   => 'Fehler',
+                'failed'  => 'Fehlgeschlagen',
+                'info'    => 'Info',
+                'started' => 'Gestartet',
+            );
+            $type_options = array(
+                ''                  => 'Alle Typen',
+                'mail_event'        => 'Mail',
+                'frontend_ajax'     => 'Frontend AJAX',
+                'form_engine_hook'  => 'Form Engine',
+                'frontend_js_error' => 'JS Fehler',
+            );
+            ?>
+            <div class="wrap sf-wrap">
+                <h1>Formular Logs</h1>
 
-            // Pagination helper
-            $pagination_base = add_query_arg(array(
-                'page'       => 'formular-logs',
-                'date_from'  => $date_from,
-                'date_to'    => $date_to,
-                'request_id' => $request_id,
-                'status'     => $status,
-                'event_type' => $event_type,
-            ), admin_url('admin.php'));
+                <?php /* ---- Filter Bar ---- */ ?>
+                <form method="get" class="sf-log-filter">
+                    <input type="hidden" name="page" value="formular-logs" />
+                    <div class="sf-log-filter__fields">
+                        <div class="sf-log-filter__group">
+                            <label for="fl-date-from">Von</label>
+                            <input type="date" id="fl-date-from" name="date_from" value="<?php echo esc_attr($date_from); ?>" />
+                        </div>
+                        <div class="sf-log-filter__sep">→</div>
+                        <div class="sf-log-filter__group">
+                            <label for="fl-date-to">Bis</label>
+                            <input type="date" id="fl-date-to" name="date_to" value="<?php echo esc_attr($date_to); ?>" />
+                        </div>
+                        <div class="sf-log-filter__divider"></div>
+                        <div class="sf-log-filter__group">
+                            <label for="fl-request-id">Request-ID</label>
+                            <input type="text" id="fl-request-id" name="request_id" value="<?php echo esc_attr($request_id); ?>" placeholder="a3f2b1…" />
+                        </div>
+                        <div class="sf-log-filter__group">
+                            <label for="fl-status">Status</label>
+                            <select id="fl-status" name="status">
+                                <?php foreach ($status_options as $val => $label) : ?>
+                                    <option value="<?php echo esc_attr($val); ?>" <?php selected($status, $val); ?>><?php echo esc_html($label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="sf-log-filter__group">
+                            <label for="fl-event-type">Typ</label>
+                            <select id="fl-event-type" name="event_type">
+                                <?php foreach ($type_options as $val => $label) : ?>
+                                    <option value="<?php echo esc_attr($val); ?>" <?php selected($event_type, $val); ?>><?php echo esc_html($label); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="sf-log-filter__actions">
+                        <button type="submit" class="sf-btn-primary">Filtern</button>
+                        <a class="sf-btn-secondary" href="<?php echo esc_url($download_url); ?>">
+                            <span class="dashicons dashicons-download"></span> CSV
+                        </a>
+                        <a class="sf-btn-secondary sf-btn-danger" href="<?php echo esc_url($cleanup_url); ?>"
+                           onclick="return confirm('Veraltete Logs jetzt unwiderruflich löschen?');">
+                            <span class="dashicons dashicons-trash"></span> Bereinigen
+                        </a>
+                    </div>
+                </form>
 
-            if ($total_groups > 0) {
-                echo '<div class="sf-pagination" style="margin:10px 0; display:flex; align-items:center; gap:8px;">';
-                echo '<span>' . esc_html($total_groups) . ' Anfragen &mdash; Seite ' . esc_html($paged) . ' von ' . esc_html($total_pages) . '</span>';
-                if ($paged > 1) {
-                    echo ' <a class="button" href="' . esc_url(add_query_arg('paged', $paged - 1, $pagination_base)) . '">&laquo; Zurück</a>';
-                }
-                if ($paged < $total_pages) {
-                    echo ' <a class="button" href="' . esc_url(add_query_arg('paged', $paged + 1, $pagination_base)) . '">Weiter &raquo;</a>';
-                }
-                echo '</div>';
-            }
+                <?php /* ---- Stats + Pagination Bar ---- */ ?>
+                <div class="sf-log-bar">
+                    <span class="sf-log-bar__count">
+                        <?php if ($total_groups > 0) : ?>
+                            <strong><?php echo esc_html($total_groups); ?></strong> Anfrage<?php echo $total_groups !== 1 ? 'n' : ''; ?>
+                            <?php if ($total_pages > 1) : ?>
+                                &middot; Seite <?php echo esc_html($paged); ?> von <?php echo esc_html($total_pages); ?>
+                            <?php endif; ?>
+                        <?php else : ?>
+                            Keine Einträge
+                        <?php endif; ?>
+                    </span>
+                    <?php if ($total_pages > 1) : ?>
+                    <div class="sf-log-bar__pagination">
+                        <?php if ($paged > 1) : ?>
+                            <a class="sf-page-btn" href="<?php echo esc_url(add_query_arg('paged', $paged - 1, $pagination_base)); ?>">&#8592; Zurück</a>
+                        <?php endif; ?>
+                        <?php if ($paged < $total_pages) : ?>
+                            <a class="sf-page-btn" href="<?php echo esc_url(add_query_arg('paged', $paged + 1, $pagination_base)); ?>">Weiter &#8594;</a>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+                </div>
 
-            echo '<table class="sf-table">';
-            echo '<thead><tr>';
-            echo '<th>Zusammenfassung</th>';
-            foreach ($columns as $column) {
-                if ($empty_columns[$column]) {
-                    continue;
-                }
-                echo '<th>' . esc_html($column) . '</th>';
-            }
-            echo '</tr></thead><tbody>';
+                <?php /* ---- Log Groups ---- */ ?>
+                <?php if (empty($all_grouped)) : ?>
+                    <div class="sf-empty-state">
+                        <span class="dashicons dashicons-search"></span>
+                        <p>Keine Log-Einträge für den gewählten Zeitraum und Filter.</p>
+                    </div>
+                <?php else : ?>
+                    <div class="sf-log-groups">
+                    <?php foreach ($grouped as $req_id => $group) :
+                        $is_error   = $group['level'] >= 3;
+                        $is_warning = $group['level'] === 2;
+                        $group_class = 'sf-log-group';
+                        if ($is_error)        $group_class .= ' sf-log-group--error';
+                        elseif ($is_warning)  $group_class .= ' sf-log-group--warning';
+                        else                  $group_class .= ' sf-log-group--success';
+                        $open = $is_error || $is_warning;
+                        $short = $this->short_id($req_id);
+                        $time  = $this->format_time($group['time']);
+                        $page  = $group['page'];
+                        $form  = $group['form'];
+                        // Parse page path only
+                        $page_display = $page !== '' ? (wp_parse_url($page, PHP_URL_PATH) ?: $page) : '';
+                    ?>
+                        <div class="<?php echo esc_attr($group_class); ?>" data-open="<?php echo $open ? '1' : '0'; ?>">
+                            <button type="button" class="sf-log-group__header" aria-expanded="<?php echo $open ? 'true' : 'false'; ?>">
+                                <span class="sf-log-group__badge">
+                                    <?php echo wp_kses($group['badge'], array('span' => array('class' => array(), 'style' => array()))); ?>
+                                </span>
+                                <span class="sf-log-group__meta">
+                                    <?php if ($time !== '') : ?><span class="sf-log-group__time"><?php echo esc_html($time); ?></span><?php endif; ?>
+                                    <?php if ($page_display !== '') : ?><span class="sf-log-group__page"><?php echo esc_html($page_display); ?></span><?php endif; ?>
+                                    <?php if ($form !== '') : ?><span class="sf-log-group__form"><?php echo esc_html($form); ?></span><?php endif; ?>
+                                </span>
+                                <span class="sf-log-group__id" title="<?php echo esc_attr($req_id); ?>"><?php echo esc_html($short); ?></span>
+                                <span class="sf-log-group__chevron">
+                                    <span class="dashicons dashicons-arrow-down-alt2"></span>
+                                </span>
+                            </button>
+                            <div class="sf-log-group__body">
+                                <ol class="sf-timeline">
+                                <?php foreach ($group['rows'] as $row) :
+                                    $row_status  = isset($row['status']) ? $row['status'] : '';
+                                    $row_stage   = isset($row['event_stage']) ? $row['event_stage'] : '';
+                                    $row_source  = isset($row['source']) ? $row['source'] : '';
+                                    $row_time    = isset($row['timestamp_utc']) ? $row['timestamp_utc'] : '';
+                                    $row_err_msg = isset($row['error_message']) ? $row['error_message'] : '';
+                                    $row_err_code= isset($row['error_code']) ? $row['error_code'] : '';
+                                    $row_recip   = isset($row['recipient']) ? $row['recipient'] : '';
+                                    $row_subject = isset($row['subject']) ? $row['subject'] : '';
+                                    $dot_class   = $this->status_dot_class($row_status);
+                                    $time_str    = $row_time !== '' ? substr($row_time, 11, 8) : '';
+                                    $payload     = isset($row['payload_json']) ? $row['payload_json'] : '';
+                                    $extra       = isset($row['extra_json']) ? $row['extra_json'] : '';
+                                    $attachments = isset($row['attachments_json']) ? $row['attachments_json'] : '';
+                                ?>
+                                    <li class="sf-timeline__item">
+                                        <span class="sf-dot <?php echo esc_attr($dot_class); ?>"></span>
+                                        <div class="sf-timeline__content">
+                                            <div class="sf-timeline__main">
+                                                <?php if ($time_str !== '') : ?><span class="sf-timeline__time"><?php echo esc_html($time_str); ?></span><?php endif; ?>
+                                                <span class="sf-timeline__stage"><?php echo esc_html($row_stage !== '' ? $row_stage : '–'); ?></span>
+                                                <?php if ($row_source !== '') : ?><span class="sf-timeline__source"><?php echo esc_html($row_source); ?></span><?php endif; ?>
+                                                <span class="sf-timeline__status sf-status--<?php echo esc_attr($row_status); ?>"><?php echo esc_html($row_status); ?></span>
+                                            </div>
+                                            <?php if ($row_err_msg !== '' || $row_err_code !== '') : ?>
+                                            <div class="sf-timeline__error">
+                                                <?php if ($row_err_code !== '') : ?><code><?php echo esc_html($row_err_code); ?></code><?php endif; ?>
+                                                <?php if ($row_err_msg !== '') : ?><span><?php echo esc_html($row_err_msg); ?></span><?php endif; ?>
+                                            </div>
+                                            <?php endif; ?>
+                                            <?php if ($row_recip !== '' || $row_subject !== '') : ?>
+                                            <div class="sf-timeline__mail">
+                                                <?php if ($row_recip !== '') : ?><span class="sf-timeline__mail-recip"><span class="dashicons dashicons-email-alt"></span> <?php echo esc_html($row_recip); ?></span><?php endif; ?>
+                                                <?php if ($row_subject !== '') : ?><span class="sf-timeline__mail-subject"><?php echo esc_html($row_subject); ?></span><?php endif; ?>
+                                            </div>
+                                            <?php endif; ?>
+                                            <?php if ($payload !== '' || $extra !== '' || $attachments !== '') : ?>
+                                            <div class="sf-timeline__json-btns">
+                                                <?php if ($payload !== '') :
+                                                    $dec = $this->crypto->decrypt($payload); ?>
+                                                    <button type="button" class="sf-json-btn fl-view-json" data-label="Payload" data-json="<?php echo esc_attr($dec); ?>">Payload</button>
+                                                <?php endif; ?>
+                                                <?php if ($extra !== '') : ?>
+                                                    <button type="button" class="sf-json-btn fl-view-json" data-label="Extra" data-json="<?php echo esc_attr($extra); ?>">Extra</button>
+                                                <?php endif; ?>
+                                                <?php if ($attachments !== '') : ?>
+                                                    <button type="button" class="sf-json-btn fl-view-json" data-label="Anhänge" data-json="<?php echo esc_attr($attachments); ?>">Anhänge</button>
+                                                <?php endif; ?>
+                                            </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                                </ol>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    </div>
 
-            if (empty($all_grouped)) {
-                echo '<tr><td colspan="' . esc_attr($visible_cols) . '">Keine passenden Eintraege.</td></tr>';
-            }
-            else {
-                $group_idx = 0;
-                foreach ($grouped as $req_id => $group) {
-                    $bg_color = ($group_idx % 2 === 0) ? '#ffffff' : '#f6f7f7';
+                    <?php if ($total_pages > 1) : ?>
+                    <div class="sf-log-bar sf-log-bar--bottom">
+                        <span class="sf-log-bar__count">Seite <?php echo esc_html($paged); ?> von <?php echo esc_html($total_pages); ?></span>
+                        <div class="sf-log-bar__pagination">
+                            <?php if ($paged > 1) : ?>
+                                <a class="sf-page-btn" href="<?php echo esc_url(add_query_arg('paged', $paged - 1, $pagination_base)); ?>">&#8592; Zurück</a>
+                            <?php endif; ?>
+                            <?php if ($paged < $total_pages) : ?>
+                                <a class="sf-page-btn" href="<?php echo esc_url(add_query_arg('paged', $paged + 1, $pagination_base)); ?>">Weiter &#8594;</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
 
-                    echo '<tr class="sf-group-header">';
-                    echo '<td colspan="' . esc_attr($visible_cols) . '">';
-                    echo '<span class="sf-group-title">Request: ' . esc_html(strpos($req_id, 'unknown_') === 0 ? 'Unbekannt' : $req_id) . '</span> &mdash; ';
-                    echo wp_kses($group['badge'], array('span' => array('class' => array()))) . ' ';
-                    if (!empty($group['time'])) {
-                        echo '<span class="sf-group-time">(' . esc_html($group['time']) . ')</span>';
-                    }
-                    echo '</td>';
-                    echo '</tr>';
-
-                    foreach ($group['rows'] as $row) {
-                        echo '<tr style="background:' . esc_attr($bg_color) . ';">';
-                        echo '<td>' . wp_kses($this->classify_problem($row), array('span' => array('class' => array()))) . '</td>';
-                        foreach ($columns as $column) {
-                            if ($empty_columns[$column]) {
-                                continue;
-                            }
-
-                            $value = isset($row[$column]) ? (string)$row[$column] : '';
-
-                            if ($value !== '' && in_array($column, array('payload_json', 'attachments_json', 'extra_json'), true)) {
-                                $decrypted = ($column === 'payload_json') ? $this->crypto->decrypt($value) : $value;
-                                echo '<td style="max-width:300px;"><button type="button" class="sf-btn-secondary fl-view-json" data-json="' . esc_attr($decrypted) . '">JSON ansehen</button></td>';
-                            }
-                            else {
-                                echo '<td style="max-width:300px;word-break:break-word;">' . esc_html($value) . '</td>';
-                            }
-                        }
-                        echo '</tr>';
-                    }
-
-                    $group_idx++;
-                }
-            }
-
-            echo '</tbody></table>';
-
-            // Bottom pagination
-            if ($total_pages > 1) {
-                echo '<div class="sf-pagination" style="margin:10px 0; display:flex; align-items:center; gap:8px;">';
-                if ($paged > 1) {
-                    echo '<a class="button" href="' . esc_url(add_query_arg('paged', $paged - 1, $pagination_base)) . '">&laquo; Zurück</a>';
-                }
-                echo '<span>Seite ' . esc_html($paged) . ' von ' . esc_html($total_pages) . '</span>';
-                if ($paged < $total_pages) {
-                    echo '<a class="button" href="' . esc_url(add_query_arg('paged', $paged + 1, $pagination_base)) . '">Weiter &raquo;</a>';
-                }
-                echo '</div>';
-            }
-
-?>
-<div id="fl-json-modal" class="sf-modal">
-    <div class="sf-modal-content">
-        <span id="fl-modal-close" class="sf-modal-close">&times;</span>
-        <h2>JSON Daten</h2>
-        <div id="fl-modal-summary"></div>
-        <pre><code id="fl-modal-content"></code></pre>
-    </div>
-</div>
-<?php
-
-            echo '</div>';
+            <div id="fl-json-modal" class="sf-modal">
+                <div class="sf-modal-content">
+                    <div class="sf-modal-header">
+                        <h2 id="fl-modal-title">JSON</h2>
+                        <button id="fl-modal-close" class="sf-modal-close" aria-label="Schließen">&times;</button>
+                    </div>
+                    <div id="fl-modal-summary"></div>
+                    <pre><code id="fl-modal-content"></code></pre>
+                </div>
+            </div>
+            <?php
         }
 
         private function is_valid_date($date)
