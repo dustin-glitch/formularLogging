@@ -314,7 +314,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
             $blocked_ips        = get_option('fl_permanently_blocked_ips', array());
             ?>
             <div class="wrap sf-wrap">
-                <h1>Einstellungen</h1>
+                <?php \Signalfeuer\FormularLogs\Admin\AdminUI::render_plugin_header('settings'); ?>
 
                 <form method="post" action="options.php" class="sf-settings-form">
                     <?php settings_fields(self::SETTINGS_GROUP); ?>

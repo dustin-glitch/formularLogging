@@ -221,6 +221,33 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         }
 
+        /** Persistent plugin header shown on every plugin page */
+        public static function render_plugin_header($current = 'logs')
+        {
+            $tabs = array(
+                'logs'     => array('label' => 'Logs',           'url' => admin_url('admin.php?page=formular-logs')),
+                'settings' => array('label' => 'Einstellungen',  'url' => admin_url('admin.php?page=formular-logging-settings')),
+                'about'    => array('label' => 'Info & Update',  'url' => admin_url('admin.php?page=formular-logs-about')),
+            );
+            ?>
+            <div class="sf-plugin-header">
+                <div class="sf-plugin-header__brand">
+                    <span class="dashicons dashicons-list-view"></span>
+                    <span class="sf-plugin-header__name">Formular Logging</span>
+                    <span class="sf-version-badge">v<?php echo esc_html(FL_FORMULAR_LOGGING_VERSION); ?></span>
+                </div>
+                <nav class="sf-plugin-header__nav" aria-label="Plugin-Navigation">
+                    <?php foreach ($tabs as $key => $tab) : ?>
+                        <a href="<?php echo esc_url($tab['url']); ?>"
+                           class="sf-plugin-header__tab<?php echo $current === $key ? ' sf-plugin-header__tab--active' : ''; ?>">
+                            <?php echo esc_html($tab['label']); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </nav>
+            </div>
+            <?php
+        }
+
         /** Human-readable column labels */
         private $column_labels = array(
             'timestamp_utc'   => 'Zeitstempel',
@@ -383,7 +410,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             );
             ?>
             <div class="wrap sf-wrap">
-                <h1>Formular Logs</h1>
+                <?php self::render_plugin_header('logs'); ?>
 
                 <?php /* ---- Filter Bar ---- */ ?>
                 <form method="get" class="sf-log-filter">
@@ -640,28 +667,7 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             $force_url  = add_query_arg('force-check', '1', $update_url);
             ?>
             <div class="wrap sf-wrap sf-about">
-
-                <?php /* ---- Plugin Header ---- */ ?>
-                <div class="sf-about-header">
-                    <div class="sf-about-header__icon">
-                        <span class="dashicons dashicons-list-view"></span>
-                    </div>
-                    <div class="sf-about-header__text">
-                        <h1>Formular Logging <span class="sf-version-badge">v<?php echo esc_html($version); ?></span></h1>
-                        <p>End-to-End-Logging für Formular-Submissions und E-Mail-Versand. Entwickelt von <strong>Signalfeuer</strong>.</p>
-                        <div class="sf-about-header__links">
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logs')); ?>" class="sf-btn-primary">
-                                <span class="dashicons dashicons-list-view"></span> Logs öffnen
-                            </a>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logging-settings')); ?>" class="sf-btn-secondary">
-                                <span class="dashicons dashicons-admin-settings"></span> Einstellungen
-                            </a>
-                            <a href="https://github.com/dustin-glitch/formularLogging" target="_blank" rel="noopener" class="sf-btn-secondary">
-                                <span class="dashicons dashicons-admin-links"></span> GitHub
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <?php self::render_plugin_header('about'); ?>
 
                 <div class="sf-about-grid">
                     <div class="sf-about-main">

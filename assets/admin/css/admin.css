@@ -1170,93 +1170,77 @@
 }
 
 /* =============================================================
-   About / Info Page
+   Persistent Plugin Header (all plugin pages)
    ============================================================= */
 
-.sf-about .sf-wrap {
-    max-width: 1100px;
-}
-
-.sf-about-header {
-    display: flex;
-    align-items: flex-start;
-    gap: 20px;
-    background: #202733;
-    color: #fff;
-    border-radius: 10px;
-    padding: 28px 30px;
-    margin-bottom: 24px;
-}
-
-.sf-about-header__icon {
-    width: 56px;
-    height: 56px;
-    background: rgba(255,255,255,.12);
-    border-radius: 12px;
+.sf-plugin-header {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    background: #202733;
+    border-radius: 8px;
+    padding: 10px 18px;
+    margin-bottom: 20px;
+    gap: 16px;
+}
+
+.sf-plugin-header__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     flex-shrink: 0;
 }
 
-.sf-about-header__icon .dashicons {
-    font-size: 28px;
-    width: 28px;
-    height: 28px;
-    color: #fff;
+.sf-plugin-header__brand .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #29b8cd;
 }
 
-.sf-about-header__text h1 {
-    margin: 0 0 6px;
-    font-size: 22px;
+.sf-plugin-header__name {
+    font-size: 14px;
     font-weight: 700;
     color: #fff;
+    letter-spacing: -.01em;
+}
+
+.sf-plugin-header .sf-version-badge {
+    background: rgba(255,255,255,.12);
+    color: rgba(255,255,255,.8);
+    font-size: 11px;
+    padding: 1px 7px;
+}
+
+.sf-plugin-header__nav {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 2px;
 }
 
-.sf-about-header__text p {
-    margin: 0 0 14px;
-    color: rgba(255,255,255,.75);
-    font-size: 14px;
-}
-
-.sf-about-header__links {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.sf-about-header__links .sf-btn-primary {
-    background: #29b8cd;
-    border-color: #29b8cd;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
+.sf-plugin-header__tab {
+    padding: 5px 12px;
+    border-radius: 5px;
     font-size: 13px;
+    color: rgba(255,255,255,.65);
+    text-decoration: none;
+    transition: background .12s, color .12s;
+    font-weight: 500;
 }
 
-.sf-about-header__links .sf-btn-secondary {
+.sf-plugin-header__tab:hover {
     background: rgba(255,255,255,.1);
-    border-color: rgba(255,255,255,.25);
-    color: #fff;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 13px;
-}
-
-.sf-about-header__links .sf-btn-secondary:hover {
-    background: rgba(255,255,255,.2);
     color: #fff;
 }
 
-.sf-about-header__links .dashicons {
-    font-size: 14px;
-    width: 14px;
-    height: 14px;
+.sf-plugin-header__tab--active {
+    background: rgba(41,184,205,.25);
+    color: #29b8cd;
 }
+
+/* =============================================================
+   About / Info Page
+   ============================================================= */
 
 .sf-version-badge {
     display: inline-block;
