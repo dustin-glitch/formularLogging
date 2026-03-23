@@ -1,4 +1,51 @@
 document.addEventListener('DOMContentLoaded', function () {
+
+    // ---- Settings: Radio option active state ----
+    document.querySelectorAll('.sf-radio-group input[type="radio"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            radio.closest('.sf-radio-group').querySelectorAll('.sf-radio-option').forEach(function (opt) {
+                opt.classList.remove('sf-radio-option--active');
+            });
+            if (radio.checked) {
+                radio.closest('.sf-radio-option').classList.add('sf-radio-option--active');
+            }
+        });
+    });
+
+    // ---- Settings: Unblock IP ----
+    document.querySelectorAll('.fl-unblock-ip').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (!confirm('Soll diese IP-Adresse wirklich entsperrt werden?')) return;
+            btn.disabled = true;
+            btn.textContent = '…';
+            var formData = new FormData();
+            formData.append('action', 'fl_unblock_ip');
+            formData.append('ip', btn.dataset.ip);
+            formData.append('nonce', btn.dataset.nonce);
+            fetch(window.ajaxurl || '/wp-admin/admin-ajax.php', { method: 'POST', body: formData })
+                .then(function (r) { return r.json(); })
+                .then(function (response) {
+                    if (response.success) {
+                        var row = btn.closest('tr');
+                        if (row) {
+                            row.style.transition = 'opacity .3s';
+                            row.style.opacity = '0';
+                            setTimeout(function () { row.remove(); }, 300);
+                        }
+                    } else {
+                        alert('Fehler: ' + (response.data || 'Unbekannt'));
+                        btn.disabled = false;
+                        btn.textContent = 'Entsperren';
+                    }
+                })
+                .catch(function () {
+                    alert('Ein Serverfehler ist aufgetreten.');
+                    btn.disabled = false;
+                    btn.textContent = 'Entsperren';
+                });
+        });
+    });
+
     var modal = document.getElementById('fl-json-modal');
     var closeBtn = document.getElementById('fl-modal-close');
     var content = document.getElementById('fl-modal-content');

@@ -20,11 +20,22 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
         public function enqueue_admin_assets($hook_suffix)
         {
             if ($hook_suffix === 'formular-logs_page_' . self::PAGE_SLUG) {
+                $css_file = FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css';
+                $js_file  = FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/js/admin.js';
+
                 wp_enqueue_style(
                     'fl-admin-style',
                     FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/css/admin.css',
                     array(),
-                    file_exists(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') ? filemtime(FL_FORMULAR_LOGGING_PLUGIN_DIR . 'assets/admin/css/admin.css') : FL_FORMULAR_LOGGING_VERSION
+                    file_exists($css_file) ? filemtime($css_file) : FL_FORMULAR_LOGGING_VERSION
+                );
+
+                wp_enqueue_script(
+                    'fl-admin-script',
+                    FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/js/admin.js',
+                    array(),
+                    file_exists($js_file) ? filemtime($js_file) : FL_FORMULAR_LOGGING_VERSION,
+                    true
                 );
             }
         }
@@ -289,67 +300,254 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\Settings')) {
                 return;
             }
 
-            echo '<div class="wrap sf-wrap">';
-            echo '<h1>Formular Logging Einstellungen</h1>';
-            echo '<div style="background:#fff; padding:20px; border:1px solid #ccd0d4; border-radius:4px; margin-top:20px;">';
-            echo '<form method="post" action="options.php">';
-            settings_fields(self::SETTINGS_GROUP);
-            do_settings_sections(self::PAGE_SLUG);
-            submit_button('Einstellungen speichern', '', '', false, array('class' => 'sf-btn-primary'));
-            echo '</form>';
-            echo '</div>';
+            $notify_enabled     = (bool) get_option('fl_notify_enabled', false);
+            $notify_email       = (string) get_option('fl_notify_email', '');
+            $notify_slack       = (string) get_option('fl_notify_slack_webhook', '');
+            $notify_cooldown    = max(1, (int) get_option('fl_notify_cooldown', 15));
+            $rl_enabled         = (bool) get_option('fl_rate_limit_enabled', false);
+            $rl_threshold       = (int) get_option('fl_rate_limit_threshold', 20);
+            $rl_duration        = (int) get_option('fl_rate_limit_duration', 60);
+            $rl_action          = get_option('fl_rate_limit_action', 'temporary');
+            $form_pages         = (string) get_option(self::OPTION_KEY, '');
+            $retention_days     = get_option('fl_retention_days', 30);
+            $custom_log_dir     = (string) get_option('fl_custom_log_dir', '');
+            $blocked_ips        = get_option('fl_permanently_blocked_ips', array());
+            ?>
+            <div class="wrap sf-wrap">
+                <h1>Einstellungen</h1>
 
-            $blocked_ips = get_option('fl_permanently_blocked_ips', array());
-            if (!empty($blocked_ips) && is_array($blocked_ips)) {
-                echo '<div style="background:#fff; padding:20px; border:1px solid #ccd0d4; border-radius:4px; margin-top:20px;">';
-                echo '<h2>Permanent blockierte IPs</h2>';
-                echo '<table class="wp-list-table widefat striped">';
-                echo '<thead><tr><th>IP-Adresse</th><th>Blockiert am</th><th>Grund</th><th>Aktion</th></tr></thead>';
-                echo '<tbody>';
-                foreach ($blocked_ips as $ip => $data) {
-                    $time = isset($data['time']) ? wp_date('d.m.Y H:i:s', $data['time']) : '-';
-                    $reason = isset($data['reason']) ? $data['reason'] : (isset($data['page']) ? 'Seite: ' . $data['page'] : '-');
-                    echo '<tr>';
-                    echo '<td>' . esc_html($ip) . '</td>';
-                    echo '<td>' . esc_html($time) . '</td>';
-                    echo '<td>' . esc_html($reason) . '</td>';
-                    echo '<td><a href="#" class="button fl-unblock-ip" data-ip="' . esc_attr($ip) . '" data-nonce="' . wp_create_nonce('fl_unblock_ip') . '">Entsperren</a></td>';
-                    echo '</tr>';
-                }
-                echo '</tbody></table>';
+                <form method="post" action="options.php" class="sf-settings-form">
+                    <?php settings_fields(self::SETTINGS_GROUP); ?>
 
-                echo '<script>
-                    jQuery(document).ready(function ($) {
-                        $(".fl-unblock-ip").on("click", function (e) {
-                            e.preventDefault();
-                            var $btn = $(this);
-                            if (!confirm("Soll diese IP-Adresse wirklich entsperrt werden?")) {
-                                return;
-                            }
-                            $.post(ajaxurl, {
-                                action: "fl_unblock_ip",
-                                ip: $btn.data("ip"),
-                                nonce: $btn.data("nonce")
-                            })
-                                .done(function (response) {
-                                    if (response.success) {
-                                        $btn.closest("tr").fadeOut(300, function () {
-                                            $(this).remove();
-                                        });
-                                    } else {
-                                        alert("Fehler: " + (response.data || "Unbekannt"));
-                                    }
-                                })
-                                .fail(function () {
-                                    alert("Ein Serverfehler ist aufgetreten.");
-                                });
-                        });
-                    });
-                </script>';
-                echo '</div>';
-            }
+                    <?php /* ---- Card: Allgemein ---- */ ?>
+                    <div class="sf-card">
+                        <div class="sf-card-header">
+                            <div class="sf-card-icon sf-card-icon--blue">
+                                <span class="dashicons dashicons-admin-settings"></span>
+                            </div>
+                            <div>
+                                <h2>Allgemein</h2>
+                                <p>Auf welchen Seiten wird geloggt und wie lange werden die Logs aufbewahrt.</p>
+                            </div>
+                        </div>
+                        <div class="sf-card-body">
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-form-pages">Formularseiten</label>
+                                    <span class="sf-setting-hint">Eine URL oder Pfad pro Zeile</span>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <textarea id="fl-form-pages" name="<?php echo esc_attr(self::OPTION_KEY); ?>" rows="6" class="sf-textarea-code"><?php echo esc_textarea($form_pages); ?></textarea>
+                                    <span class="sf-hint">z.B. <code>/kontakt</code> oder <code>https://example.com/formular</code></span>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-retention">Speicherdauer</label>
+                                    <span class="sf-setting-hint">Automatische Löschung alter Logs</span>
+                                </div>
+                                <div class="sf-setting-input sf-setting-inline">
+                                    <input type="number" id="fl-retention" name="fl_retention_days" value="<?php echo esc_attr((string) $retention_days); ?>" min="0.001" step="any" class="sf-input-short" />
+                                    <span class="sf-unit">Tage</span>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-log-dir">Log-Verzeichnis</label>
+                                    <span class="sf-setting-hint">Optional — Standard: <code>wp-content/uploads/form-logs/</code></span>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <input type="text" id="fl-log-dir" name="fl_custom_log_dir" value="<?php echo esc_attr($custom_log_dir); ?>" class="sf-input-wide" placeholder="/var/www/virtual/user/logs" />
+                                    <span class="sf-hint">Absoluter Pfad auf dem Server. Auf Nginx-Servern empfohlen, da <code>.htaccess</code> dort nicht greift.</span>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row sf-setting-row--last">
+                                <div class="sf-setting-label">
+                                    <label for="fl-github-token">GitHub Access Token</label>
+                                    <span class="sf-setting-hint">Für automatische Updates</span>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <?php if (defined('FL_GITHUB_UPDATE_TOKEN') && FL_GITHUB_UPDATE_TOKEN !== '') : ?>
+                                        <input type="password" class="sf-input-wide" value="••••••••••••••••" disabled />
+                                        <span class="sf-hint sf-hint--info">Token wird aus der <code>wp-config.php</code> Konstante <code>FL_GITHUB_UPDATE_TOKEN</code> geladen.</span>
+                                    <?php else : ?>
+                                        <input type="password" id="fl-github-token" name="fl_github_update_token" value="<?php echo esc_attr((string) get_option('fl_github_update_token', '')); ?>" class="sf-input-wide" />
+                                        <span class="sf-hint">Sicherer: <code>define('FL_GITHUB_UPDATE_TOKEN', 'ghp_...');</code> in <code>wp-config.php</code> eintragen.</span>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-            echo '</div>';
+                    <?php /* ---- Card: Benachrichtigungen ---- */ ?>
+                    <div class="sf-card">
+                        <div class="sf-card-header">
+                            <div class="sf-card-icon sf-card-icon--orange">
+                                <span class="dashicons dashicons-bell"></span>
+                            </div>
+                            <div>
+                                <h2>Fehler-Benachrichtigungen</h2>
+                                <p>Alert per E-Mail und/oder Slack bei kritischen System- oder Mailfehlern. Validierungs- und Captcha-Fehler lösen keinen Alert aus.</p>
+                            </div>
+                        </div>
+                        <div class="sf-card-body">
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label>Benachrichtigungen</label>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <label class="sf-toggle">
+                                        <input type="checkbox" name="fl_notify_enabled" value="1" <?php checked($notify_enabled, true); ?> />
+                                        <span class="sf-toggle-slider"></span>
+                                        <span class="sf-toggle-label">Aktivieren</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-notify-email">E-Mail-Empfänger</label>
+                                    <span class="sf-setting-hint">Eine Adresse pro Zeile</span>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <textarea id="fl-notify-email" name="fl_notify_email" rows="3" class="sf-textarea-code"><?php echo esc_textarea($notify_email); ?></textarea>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-notify-slack">Slack Webhook URL</label>
+                                    <span class="sf-setting-hint">Incoming Webhook des Slack-Kanals</span>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <input type="url" id="fl-notify-slack" name="fl_notify_slack_webhook" value="<?php echo esc_attr($notify_slack); ?>" class="sf-input-wide" placeholder="https://hooks.slack.com/services/..." />
+                                </div>
+                            </div>
+                            <div class="sf-setting-row sf-setting-row--last">
+                                <div class="sf-setting-label">
+                                    <label for="fl-notify-cooldown">Cooldown</label>
+                                    <span class="sf-setting-hint">Mindestabstand zwischen Alerts</span>
+                                </div>
+                                <div class="sf-setting-input sf-setting-inline">
+                                    <input type="number" id="fl-notify-cooldown" name="fl_notify_cooldown" value="<?php echo esc_attr((string) $notify_cooldown); ?>" min="1" class="sf-input-short" />
+                                    <span class="sf-unit">Minuten</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php /* ---- Card: Rate Limiting ---- */ ?>
+                    <div class="sf-card">
+                        <div class="sf-card-header">
+                            <div class="sf-card-icon sf-card-icon--red">
+                                <span class="dashicons dashicons-shield"></span>
+                            </div>
+                            <div>
+                                <h2>Rate Limiting & Sicherheit</h2>
+                                <p>IPs automatisch sperren, wenn sie zu viele Fehler in kurzer Zeit produzieren.</p>
+                            </div>
+                        </div>
+                        <div class="sf-card-body">
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label>Rate Limiting</label>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <label class="sf-toggle">
+                                        <input type="checkbox" name="fl_rate_limit_enabled" value="1" <?php checked($rl_enabled, true); ?> />
+                                        <span class="sf-toggle-slider"></span>
+                                        <span class="sf-toggle-label">IP-Blockierung aktivieren</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-rl-threshold">Fehler-Schwellenwert</label>
+                                    <span class="sf-setting-hint">Innerhalb von 5 Minuten</span>
+                                </div>
+                                <div class="sf-setting-input sf-setting-inline">
+                                    <input type="number" id="fl-rl-threshold" name="fl_rate_limit_threshold" value="<?php echo esc_attr((string) $rl_threshold); ?>" min="1" class="sf-input-short" />
+                                    <span class="sf-unit">Fehler</span>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row">
+                                <div class="sf-setting-label">
+                                    <label for="fl-rl-duration">Sperrdauer</label>
+                                    <span class="sf-setting-hint">Gilt nur bei temporärer Sperre</span>
+                                </div>
+                                <div class="sf-setting-input sf-setting-inline">
+                                    <input type="number" id="fl-rl-duration" name="fl_rate_limit_duration" value="<?php echo esc_attr((string) $rl_duration); ?>" min="1" class="sf-input-short" />
+                                    <span class="sf-unit">Minuten</span>
+                                </div>
+                            </div>
+                            <div class="sf-setting-row sf-setting-row--last">
+                                <div class="sf-setting-label">
+                                    <label>Aktion bei Überschreitung</label>
+                                </div>
+                                <div class="sf-setting-input">
+                                    <div class="sf-radio-group">
+                                        <label class="sf-radio-option <?php echo $rl_action === 'temporary' ? 'sf-radio-option--active' : ''; ?>">
+                                            <input type="radio" name="fl_rate_limit_action" value="temporary" <?php checked($rl_action, 'temporary'); ?> />
+                                            <span class="sf-radio-title">Temporär</span>
+                                            <span class="sf-radio-desc">Für die eingestellte Sperrdauer</span>
+                                        </label>
+                                        <label class="sf-radio-option <?php echo $rl_action === 'permanent' ? 'sf-radio-option--active' : ''; ?>">
+                                            <input type="radio" name="fl_rate_limit_action" value="permanent" <?php checked($rl_action, 'permanent'); ?> />
+                                            <span class="sf-radio-title">Permanent</span>
+                                            <span class="sf-radio-desc">Manuelles Entsperren nötig</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sf-settings-footer">
+                        <button type="submit" class="sf-btn-primary">Einstellungen speichern</button>
+                    </div>
+
+                </form>
+
+                <?php /* ---- Blockierte IPs ---- */ ?>
+                <?php if (!empty($blocked_ips) && is_array($blocked_ips)) : ?>
+                <div class="sf-card sf-card--blocked-ips">
+                    <div class="sf-card-header">
+                        <div class="sf-card-icon sf-card-icon--red">
+                            <span class="dashicons dashicons-dismiss"></span>
+                        </div>
+                        <div>
+                            <h2>Permanent blockierte IPs</h2>
+                            <p><?php echo count($blocked_ips); ?> IP-Adresse<?php echo count($blocked_ips) !== 1 ? 'n' : ''; ?> blockiert</p>
+                        </div>
+                    </div>
+                    <div class="sf-card-body sf-card-body--flush">
+                        <table class="sf-blocked-table">
+                            <thead>
+                                <tr>
+                                    <th>IP-Adresse</th>
+                                    <th>Blockiert am</th>
+                                    <th>Grund</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($blocked_ips as $ip => $data) :
+                                    $time   = isset($data['time']) ? wp_date('d.m.Y H:i', $data['time']) : '–';
+                                    $reason = isset($data['reason']) ? $data['reason'] : (isset($data['page']) ? 'Seite: ' . $data['page'] : '–');
+                                ?>
+                                <tr>
+                                    <td><code><?php echo esc_html($ip); ?></code></td>
+                                    <td><?php echo esc_html($time); ?></td>
+                                    <td><?php echo esc_html($reason); ?></td>
+                                    <td><button type="button" class="sf-btn-unblock fl-unblock-ip" data-ip="<?php echo esc_attr($ip); ?>" data-nonce="<?php echo wp_create_nonce('fl_unblock_ip'); ?>">Entsperren</button></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <?php endif; ?>
+
+            </div>
+            <?php
         }
 
         public function render_section_description()
