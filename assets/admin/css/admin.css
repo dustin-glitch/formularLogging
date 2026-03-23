@@ -544,3 +544,521 @@
     opacity: .5;
     cursor: default;
 }
+
+/* =============================================================
+   Log Page: Filter Bar
+   ============================================================= */
+
+.sf-log-filter {
+    background: #fff;
+    border: 1px solid #dde0e4;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+
+.sf-log-filter__fields {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+}
+
+.sf-log-filter__group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.sf-log-filter__group label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #787c82;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}
+
+.sf-log-filter__group input[type="date"],
+.sf-log-filter__group input[type="text"],
+.sf-log-filter__group select {
+    padding: 6px 9px;
+    border: 1px solid #ccd0d4;
+    border-radius: 5px;
+    font-size: 13px;
+    color: #2c3338;
+    background: #fff;
+    height: 32px;
+    line-height: 1;
+}
+
+.sf-log-filter__group input[type="text"] {
+    width: 130px;
+}
+
+.sf-log-filter__group input[type="date"] {
+    width: 140px;
+}
+
+.sf-log-filter__group select {
+    min-width: 130px;
+}
+
+.sf-log-filter__group input:focus,
+.sf-log-filter__group select:focus {
+    border-color: #29b8cd;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(41,184,205,.15);
+}
+
+.sf-log-filter__sep {
+    font-size: 16px;
+    color: #c3c4c7;
+    padding-bottom: 4px;
+    align-self: flex-end;
+    line-height: 32px;
+}
+
+.sf-log-filter__divider {
+    width: 1px;
+    height: 32px;
+    background: #dde0e4;
+    align-self: flex-end;
+    margin: 0 4px;
+}
+
+.sf-log-filter__actions {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+.sf-log-filter__actions .sf-btn-primary,
+.sf-log-filter__actions .sf-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.sf-log-filter__actions .dashicons {
+    font-size: 14px;
+    width: 14px;
+    height: 14px;
+    margin-top: 1px;
+}
+
+.sf-btn-danger {
+    border-color: #d63638 !important;
+    color: #d63638 !important;
+}
+
+.sf-btn-danger:hover {
+    background: #d63638 !important;
+    color: #fff !important;
+}
+
+/* =============================================================
+   Log Page: Stats / Pagination Bar
+   ============================================================= */
+
+.sf-log-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    min-height: 28px;
+}
+
+.sf-log-bar--bottom {
+    margin-top: 16px;
+    margin-bottom: 0;
+}
+
+.sf-log-bar__count {
+    font-size: 13px;
+    color: #646970;
+}
+
+.sf-log-bar__count strong {
+    color: #202733;
+}
+
+.sf-log-bar__pagination {
+    display: flex;
+    gap: 6px;
+}
+
+.sf-page-btn {
+    display: inline-block;
+    padding: 5px 12px;
+    border: 1px solid #ccd0d4;
+    border-radius: 5px;
+    font-size: 13px;
+    color: #2c3338;
+    text-decoration: none;
+    background: #fff;
+    transition: border-color .15s, background .15s;
+}
+
+.sf-page-btn:hover {
+    border-color: #29b8cd;
+    background: #f7feff;
+    color: #2c3338;
+}
+
+/* =============================================================
+   Log Page: Groups (Accordion Cards)
+   ============================================================= */
+
+.sf-log-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sf-log-group {
+    border: 1px solid #dde0e4;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    transition: box-shadow .15s;
+}
+
+.sf-log-group:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+
+/* Left accent stripe via border-left */
+.sf-log-group--error  { border-left: 4px solid #d63638; }
+.sf-log-group--warning { border-left: 4px solid #dba617; }
+.sf-log-group--success { border-left: 4px solid #00a32a; }
+
+.sf-log-group__header {
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 11px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    transition: background .12s;
+}
+
+.sf-log-group__header:hover {
+    background: #fafbfc;
+}
+
+.sf-log-group__badge {
+    flex-shrink: 0;
+}
+
+.sf-log-group__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.sf-log-group__time {
+    font-size: 12px;
+    color: #646970;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.sf-log-group__page {
+    font-size: 13px;
+    color: #202733;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+
+.sf-log-group__form {
+    font-size: 12px;
+    color: #787c82;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+    padding: 1px 6px;
+    background: #f0f0f1;
+    border-radius: 3px;
+}
+
+.sf-log-group__id {
+    font-size: 11px;
+    color: #a7aaad;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+
+.sf-log-group__chevron {
+    flex-shrink: 0;
+    color: #a7aaad;
+    display: flex;
+    align-items: center;
+}
+
+.sf-log-group__chevron .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    transition: transform .2s;
+}
+
+.sf-log-group[data-open="1"] .sf-log-group__chevron .dashicons,
+.sf-log-group--open .sf-log-group__chevron .dashicons {
+    transform: rotate(180deg);
+}
+
+/* Body: hidden by default, shown when open */
+.sf-log-group__body {
+    display: none;
+    border-top: 1px solid #f0f1f2;
+    padding: 0 16px 12px;
+}
+
+.sf-log-group[data-open="1"] .sf-log-group__body,
+.sf-log-group--open .sf-log-group__body {
+    display: block;
+}
+
+/* =============================================================
+   Log Page: Timeline
+   ============================================================= */
+
+.sf-timeline {
+    list-style: none;
+    margin: 0;
+    padding: 10px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.sf-timeline__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 7px 0;
+    border-bottom: 1px solid #f6f7f7;
+    position: relative;
+}
+
+.sf-timeline__item:last-child {
+    border-bottom: none;
+}
+
+/* Dot */
+.sf-dot {
+    flex-shrink: 0;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-top: 4px;
+}
+
+.sf-dot--success  { background: #00a32a; }
+.sf-dot--error    { background: #d63638; }
+.sf-dot--info     { background: #29b8cd; }
+.sf-dot--started  { background: #dba617; }
+.sf-dot--unknown  { background: #c3c4c7; }
+
+/* Content */
+.sf-timeline__content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.sf-timeline__main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.sf-timeline__time {
+    font-size: 12px;
+    color: #787c82;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    flex-shrink: 0;
+}
+
+.sf-timeline__stage {
+    font-size: 13px;
+    color: #202733;
+    font-weight: 500;
+}
+
+.sf-timeline__source {
+    font-size: 11px;
+    color: #a7aaad;
+    padding: 1px 5px;
+    background: #f0f0f1;
+    border-radius: 3px;
+}
+
+.sf-timeline__status {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.sf-status--success { background: #e8f9ec; color: #00742a; }
+.sf-status--error   { background: #fce8e9; color: #a02022; }
+.sf-status--failed  { background: #fce8e9; color: #a02022; }
+.sf-status--info    { background: #e5f7fa; color: #0e6e7e; }
+.sf-status--started { background: #fef8e7; color: #7a5a00; }
+
+/* Error line */
+.sf-timeline__error {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12px;
+    color: #d63638;
+}
+
+.sf-timeline__error code {
+    background: #fce8e9;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.sf-timeline__error span {
+    color: #646970;
+}
+
+/* Mail info */
+.sf-timeline__mail {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #646970;
+}
+
+.sf-timeline__mail-recip .dashicons {
+    font-size: 13px;
+    width: 13px;
+    height: 13px;
+    vertical-align: middle;
+    color: #29b8cd;
+    margin-right: 2px;
+}
+
+.sf-timeline__mail-subject {
+    color: #a7aaad;
+    font-style: italic;
+}
+
+/* JSON Buttons */
+.sf-timeline__json-btns {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.sf-json-btn {
+    background: #f0f6fc;
+    border: 1px solid #c8d9e8;
+    color: #2271b1;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+    line-height: 1.6;
+}
+
+.sf-json-btn:hover {
+    background: #e0edf8;
+    border-color: #2271b1;
+}
+
+/* =============================================================
+   Log Page: Empty State
+   ============================================================= */
+
+.sf-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #a7aaad;
+}
+
+.sf-empty-state .dashicons {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 10px;
+}
+
+.sf-empty-state p {
+    font-size: 14px;
+    margin: 0;
+}
+
+/* =============================================================
+   Log Page: Modal (updated header)
+   ============================================================= */
+
+.sf-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #dde0e4;
+}
+
+.sf-modal-header h2 {
+    margin: 0;
+    font-size: 16px;
+    color: #202733;
+}
+
+.sf-modal-content pre {
+    max-height: 420px;
+}
+
+/* Modal close as icon button */
+#fl-modal-close {
+    background: none;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: #a7aaad;
+    padding: 0;
+    flex-shrink: 0;
+}
+
+#fl-modal-close:hover {
+    color: #202733;
+}

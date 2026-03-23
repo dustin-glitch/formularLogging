@@ -12,6 +12,30 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
+    // ---- Log Page: Accordion groups ----
+    document.querySelectorAll('.sf-log-group').forEach(function (group) {
+        var header = group.querySelector('.sf-log-group__header');
+        if (!header) return;
+
+        // Initialise open state from data-open attribute
+        if (group.dataset.open === '1') {
+            group.classList.add('sf-log-group--open');
+        }
+
+        header.addEventListener('click', function () {
+            var isOpen = group.classList.contains('sf-log-group--open');
+            if (isOpen) {
+                group.classList.remove('sf-log-group--open');
+                group.dataset.open = '0';
+                header.setAttribute('aria-expanded', 'false');
+            } else {
+                group.classList.add('sf-log-group--open');
+                group.dataset.open = '1';
+                header.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
+
     // ---- Settings: Unblock IP ----
     document.querySelectorAll('.fl-unblock-ip').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -49,6 +73,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var modal = document.getElementById('fl-json-modal');
     var closeBtn = document.getElementById('fl-modal-close');
     var content = document.getElementById('fl-modal-content');
+    var modalTitle = document.getElementById('fl-modal-title');
 
     if (!modal || !closeBtn || !content) {
         return;
@@ -68,9 +93,14 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.addEventListener('click', function (e) {
             e.preventDefault();
             var rawJson = btn.getAttribute('data-json');
+            var label = btn.getAttribute('data-label') || 'JSON';
             var formatted = rawJson;
             var summaryHtml = '';
             var summaryContainer = document.getElementById('fl-modal-summary');
+
+            if (modalTitle) {
+                modalTitle.textContent = label;
+            }
 
             try {
                 var parsed = JSON.parse(rawJson);
