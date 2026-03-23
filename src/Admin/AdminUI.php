@@ -627,11 +627,19 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
             $token_set  = defined('FL_GITHUB_UPDATE_TOKEN') ? true : !empty(get_option('fl_github_update_token', ''));
 
             $changelog = array(
+                '1.3.1' => array(
+                    'date'  => '2026-03',
+                    'items' => array(
+                        'Fix: Update-Card Layout im Info-Panel korrigiert',
+                    ),
+                ),
                 '1.3.0' => array(
                     'date'  => '2026-03',
                     'items' => array(
                         'Dashboard-Widget neu gestaltet: Fehlerrate, 7-Tage-Übersicht',
                         'Neue "Info & Update"-Seite mit System-Check und Changelog',
+                        'Persistente Plugin-Navigation auf allen Seiten',
+                        'Einstellungen full width',
                     ),
                 ),
                 '1.2.0' => array(
