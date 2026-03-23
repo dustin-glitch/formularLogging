@@ -39,38 +39,61 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
 
         public function render_dashboard_widget()
         {
-            $stats = $this->storage->get_aggregated_stats_for_last_days(7);
+            $stats         = $this->storage->get_aggregated_stats_for_last_days(7);
+            $today_success = (int) end($stats['success']);
+            $today_errors  = (int) end($stats['errors']);
+            $today_total   = $today_success + $today_errors;
+            $week_success  = array_sum($stats['success']);
+            $week_errors   = array_sum($stats['errors']);
+            $error_rate    = ($today_total > 0) ? round($today_errors / $today_total * 100) : 0;
+            $today_label   = wp_date('d.m.Y');
+            ?>
+            <div class="fl-widget">
+                <div class="fl-widget__today">
+                    <div class="fl-widget__stat fl-widget__stat--total">
+                        <span class="fl-widget__num"><?php echo esc_html($today_total); ?></span>
+                        <span class="fl-widget__label">Anfragen heute<br><small><?php echo esc_html($today_label); ?></small></span>
+                    </div>
+                    <div class="fl-widget__divider"></div>
+                    <div class="fl-widget__stat">
+                        <span class="fl-widget__num fl-widget__num--success"><?php echo esc_html($today_success); ?></span>
+                        <span class="fl-widget__label">Erfolgreich</span>
+                    </div>
+                    <div class="fl-widget__stat">
+                        <span class="fl-widget__num fl-widget__num--error"><?php echo esc_html($today_errors); ?></span>
+                        <span class="fl-widget__label">Fehler</span>
+                    </div>
+                    <?php if ($today_total > 0) : ?>
+                    <div class="fl-widget__stat">
+                        <span class="fl-widget__num fl-widget__num--<?php echo $error_rate > 20 ? 'error' : 'neutral'; ?>"><?php echo esc_html($error_rate); ?>%</span>
+                        <span class="fl-widget__label">Fehlerrate</span>
+                    </div>
+                    <?php endif; ?>
+                </div>
 
-            $today_success = end($stats['success']);
-            $today_errors = end($stats['errors']);
-            $today_total = $today_success + $today_errors;
-            $today_date = wp_date('Y-m-d');
+                <div class="fl-widget__chart-wrap">
+                    <canvas id="fl-stats-chart"></canvas>
+                </div>
 
-            echo '<div style="background:#f6f7f7; padding:15px; border-radius:4px; text-align:center; border:1px solid #ccd0d4;">';
-            echo '<h3 style="margin-top:0; color:#1d2327;">Heute (' . esc_html($today_date) . ')</h3>';
-            echo '<p style="font-size:24px; font-weight:bold; margin:10px 0; color:#1d2327;">' . esc_html((string)$today_total) . ' <span style="font-size:14px; font-weight:normal; color:#646970;">Anfragen</span></p>';
-            echo '<div style="display:flex; justify-content:space-around; margin-top:10px; padding-bottom:15px; border-bottom:1px solid #ccd0d4;">';
-            echo '  <div style="flex:1;"><strong style="color:#00a32a; font-size:18px;">' . esc_html((string)$today_success) . '</strong><br><span style="color:#646970; font-size:12px;">Erfolgreich</span></div>';
-            echo '  <div style="flex:1;"><strong style="color:#d63638; font-size:18px;">' . esc_html((string)$today_errors) . '</strong><br><span style="color:#646970; font-size:12px;">Fehler</span></div>';
-            echo '</div>';
+                <script>var flStatsData = <?php echo wp_json_encode($stats); ?>;</script>
 
-            echo '<div style="margin-top:15px; margin-bottom:15px;">';
-            echo '<canvas id="fl-stats-chart" style="max-height: 200px; width: 100%;"></canvas>';
-            echo '</div>';
+                <div class="fl-widget__week">
+                    <span class="fl-widget__week-label">7 Tage gesamt:</span>
+                    <span class="fl-widget__week-val fl-widget__num--success"><?php echo esc_html($week_success); ?> ✓</span>
+                    <span class="fl-widget__week-val fl-widget__num--error"><?php echo esc_html($week_errors); ?> ✗</span>
+                </div>
 
-            echo '<script>';
-            echo 'var flStatsData = '.wp_json_encode($stats). ';';
-            echo '</script>';
-
-            echo '<div style="margin-top:20px;">';
-            echo '  <a href="' . esc_url(admin_url('admin.php?page=formular-logs')) . '" class="button button-primary" style="background:#F26B22; border-color:#F26B22;">Zu den Logs</a>';
-            echo '</div>';
-            echo '</div>';
+                <div class="fl-widget__footer">
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logs')); ?>" class="sf-btn-primary">Logs öffnen</a>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logs-about')); ?>" class="sf-btn-secondary">Info & Update</a>
+                </div>
+            </div>
+            <?php
         }
 
         public function enqueue_admin_assets($hook_suffix)
         {
-            if ($hook_suffix === 'toplevel_page_formular-logs' || $hook_suffix === 'formular-logs_page_formular-logs' || $hook_suffix === 'index.php') {
+            if (in_array($hook_suffix, array('toplevel_page_formular-logs', 'formular-logs_page_formular-logs', 'formular-logs_page_formular-logs-about', 'index.php'), true)) {
                 wp_enqueue_style(
                     'fl-admin-style',
                     FL_FORMULAR_LOGGING_PLUGIN_URL . 'assets/admin/css/admin.css',
@@ -115,6 +138,15 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                 'manage_options',
                 'formular-logs',
                 array($this, 'render_admin_page')
+            );
+
+            add_submenu_page(
+                'formular-logs',
+                'Info & Update',
+                'Info & Update',
+                'manage_options',
+                'formular-logs-about',
+                array($this, 'render_about_page')
             );
         }
 
@@ -547,6 +579,191 @@ if (!class_exists('Signalfeuer\FormularLogs\Admin\AdminUI')) {
                     </div>
                     <div id="fl-modal-summary"></div>
                     <pre><code id="fl-modal-content"></code></pre>
+                </div>
+            </div>
+            <?php
+        }
+
+        public function render_about_page()
+        {
+            if (!current_user_can('manage_options')) {
+                return;
+            }
+
+            $version    = FL_FORMULAR_LOGGING_VERSION;
+            $php_ok     = version_compare(PHP_VERSION, '7.4', '>=');
+            $wp_version = get_bloginfo('version');
+            $wp_ok      = version_compare($wp_version, '5.8', '>=');
+            $ssl_ok     = function_exists('openssl_encrypt');
+            $log_dir    = $this->storage->get_log_dir();
+            $log_ok     = is_dir($log_dir) && is_writable($log_dir);
+            $token_set  = defined('FL_GITHUB_UPDATE_TOKEN') ? true : !empty(get_option('fl_github_update_token', ''));
+
+            $changelog = array(
+                '1.3.0' => array(
+                    'date'  => '2026-03',
+                    'items' => array(
+                        'Dashboard-Widget neu gestaltet: Fehlerrate, 7-Tage-Übersicht',
+                        'Neue "Info & Update"-Seite mit System-Check und Changelog',
+                    ),
+                ),
+                '1.2.0' => array(
+                    'date'  => '2026-03',
+                    'items' => array(
+                        'Fehler-Benachrichtigungen per E-Mail und Slack',
+                        'Datumsbereich-Filter (bis zu 14 Tage)',
+                        'Log-Seite komplett neu gestaltet: Accordion, Timeline, Status-Dots',
+                        'Settings-Seite mit Card-Layout und Toggle-Switches',
+                        'Security: Rate Limiting AJAX-Bypass gefixt, Payload-Größenlimit (64 KB)',
+                        'CSV-Injection-Schutz, Stats-Caching, Chart.js lokal gebündelt',
+                    ),
+                ),
+                '1.1.0' => array(
+                    'date'  => '2025',
+                    'items' => array(
+                        'Permanentes IP-Blocking',
+                        'Dashboard-Widget mit Chart.js',
+                        'AES-256-CBC Payload-Verschlüsselung',
+                    ),
+                ),
+                '1.0.0' => array(
+                    'date'  => '2025',
+                    'items' => array(
+                        'Erste stabile Version',
+                        'End-to-End-Logging, Request-ID-Gruppierung',
+                        'Rate Limiting, CSV-Export',
+                    ),
+                ),
+            );
+
+            $update_url = admin_url('update-core.php');
+            $force_url  = add_query_arg('force-check', '1', $update_url);
+            ?>
+            <div class="wrap sf-wrap sf-about">
+
+                <?php /* ---- Plugin Header ---- */ ?>
+                <div class="sf-about-header">
+                    <div class="sf-about-header__icon">
+                        <span class="dashicons dashicons-list-view"></span>
+                    </div>
+                    <div class="sf-about-header__text">
+                        <h1>Formular Logging <span class="sf-version-badge">v<?php echo esc_html($version); ?></span></h1>
+                        <p>End-to-End-Logging für Formular-Submissions und E-Mail-Versand. Entwickelt von <strong>Signalfeuer</strong>.</p>
+                        <div class="sf-about-header__links">
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logs')); ?>" class="sf-btn-primary">
+                                <span class="dashicons dashicons-list-view"></span> Logs öffnen
+                            </a>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=formular-logging-settings')); ?>" class="sf-btn-secondary">
+                                <span class="dashicons dashicons-admin-settings"></span> Einstellungen
+                            </a>
+                            <a href="https://github.com/dustin-glitch/formularLogging" target="_blank" rel="noopener" class="sf-btn-secondary">
+                                <span class="dashicons dashicons-admin-links"></span> GitHub
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sf-about-grid">
+                    <div class="sf-about-main">
+
+                        <?php /* ---- Changelog ---- */ ?>
+                        <div class="sf-card">
+                            <div class="sf-card-header">
+                                <div class="sf-card-icon sf-card-icon--blue">
+                                    <span class="dashicons dashicons-update"></span>
+                                </div>
+                                <div>
+                                    <h2>Changelog</h2>
+                                    <p>Versionshistorie und neue Features</p>
+                                </div>
+                            </div>
+                            <div class="sf-card-body sf-card-body--flush">
+                                <?php foreach ($changelog as $ver => $release) :
+                                    $is_current = ($ver === $version);
+                                ?>
+                                <div class="sf-changelog-release<?php echo $is_current ? ' sf-changelog-release--current' : ''; ?>">
+                                    <div class="sf-changelog-release__header">
+                                        <span class="sf-changelog-ver">v<?php echo esc_html($ver); ?></span>
+                                        <?php if ($is_current) : ?>
+                                            <span class="sf-badge sf-badge-success" style="font-size:10px; padding:2px 7px;">Aktuell</span>
+                                        <?php endif; ?>
+                                        <span class="sf-changelog-date"><?php echo esc_html($release['date']); ?></span>
+                                    </div>
+                                    <ul class="sf-changelog-items">
+                                        <?php foreach ($release['items'] as $item) : ?>
+                                            <li><?php echo esc_html($item); ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="sf-about-side">
+
+                        <?php /* ---- System-Check ---- */ ?>
+                        <div class="sf-card">
+                            <div class="sf-card-header">
+                                <div class="sf-card-icon sf-card-icon--orange">
+                                    <span class="dashicons dashicons-admin-tools"></span>
+                                </div>
+                                <div>
+                                    <h2>System-Check</h2>
+                                    <p>Kompatibilität und Umgebung</p>
+                                </div>
+                            </div>
+                            <div class="sf-card-body sf-card-body--flush">
+                                <?php
+                                $checks = array(
+                                    array('label' => 'PHP-Version', 'value' => PHP_VERSION, 'ok' => $php_ok, 'req' => '≥ 7.4'),
+                                    array('label' => 'WordPress', 'value' => $wp_version, 'ok' => $wp_ok, 'req' => '≥ 5.8'),
+                                    array('label' => 'OpenSSL (AES)', 'value' => $ssl_ok ? 'Verfügbar' : 'Fehlt', 'ok' => $ssl_ok, 'req' => 'Pflicht'),
+                                    array('label' => 'Log-Verzeichnis', 'value' => $log_ok ? 'Beschreibbar' : 'Nicht beschreibbar', 'ok' => $log_ok, 'req' => 'Pflicht'),
+                                    array('label' => 'GitHub-Token', 'value' => $token_set ? 'Gesetzt' : 'Nicht gesetzt', 'ok' => $token_set, 'req' => 'Für Updates'),
+                                );
+                                foreach ($checks as $i => $check) :
+                                    $last = ($i === count($checks) - 1);
+                                ?>
+                                <div class="sf-syscheck<?php echo $last ? ' sf-setting-row--last' : ''; ?>">
+                                    <span class="sf-syscheck__label"><?php echo esc_html($check['label']); ?></span>
+                                    <span class="sf-syscheck__value"><?php echo esc_html($check['value']); ?></span>
+                                    <span class="sf-syscheck__status sf-syscheck__status--<?php echo $check['ok'] ? 'ok' : 'fail'; ?>">
+                                        <?php echo $check['ok'] ? '✓' : '✗'; ?>
+                                    </span>
+                                </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <?php /* ---- Updates ---- */ ?>
+                        <div class="sf-card">
+                            <div class="sf-card-header">
+                                <div class="sf-card-icon sf-card-icon--blue">
+                                    <span class="dashicons dashicons-cloud-upload"></span>
+                                </div>
+                                <div>
+                                    <h2>Plugin-Updates</h2>
+                                    <p>Updates via GitHub (Plugin Update Checker)</p>
+                                </div>
+                            </div>
+                            <div class="sf-card-body">
+                                <div class="sf-setting-row sf-setting-row--last">
+                                    <div class="sf-setting-label">
+                                        <label>Installierte Version</label>
+                                        <span class="sf-setting-hint">Branch: <code>main</code></span>
+                                    </div>
+                                    <div class="sf-setting-input sf-setting-inline">
+                                        <span class="sf-version-badge">v<?php echo esc_html($version); ?></span>
+                                        <a href="<?php echo esc_url($force_url); ?>" class="sf-btn-secondary">
+                                            <span class="dashicons dashicons-update"></span> Jetzt prüfen
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
             </div>
             <?php
