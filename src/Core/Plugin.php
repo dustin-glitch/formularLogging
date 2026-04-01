@@ -298,9 +298,26 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
                         $response = $next($response);
                     }
 
+                    $submission = ($response && method_exists($response, 'submission')) ? $response->submission() : null;
+
+                    $form_identifier = '';
+                    if ($submission && method_exists($submission, 'form') && $submission->form() !== null && method_exists($submission->form(), 'id')) {
+                        $form_identifier = (string)$submission->form()->id();
+                    }
+                    if ($form_identifier === '') {
+                        $form_identifier = $this->context->detect_form_identifier();
+                    }
+
+                    $payload_json = '';
+                    if ($submission && method_exists($submission, 'data')) {
+                        $payload_json = $this->context->json_encode_safe($submission->data());
+                    }
+
                     $args = array();
-                    if ($response && method_exists($response, 'toArray')) {
-                        $args['response'] = $response->toArray();
+                    if ($submission && method_exists($submission, 'toArray')) {
+                        $extra = $submission->toArray();
+                        unset($extra['data']); // data goes to payload_json
+                        $args['submission'] = $extra;
                     }
 
                     $status = 'info';
@@ -318,7 +335,8 @@ if (!class_exists('Signalfeuer\FormularLogs\Core\Plugin')) {
                         'event_stage' => $stage,
                         'status' => $status,
                         'source' => 'essentials_hook',
-                        'form_identifier' => $this->context->detect_form_identifier(),
+                        'form_identifier' => $form_identifier,
+                        'payload_json' => $payload_json,
                         'extra_json' => $this->context->json_encode_safe($args),
                     ),
                         $this->context

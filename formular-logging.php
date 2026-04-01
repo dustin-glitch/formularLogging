@@ -3,7 +3,7 @@
  * Plugin Name: Formular Logging
  * Plugin URI: https://github.com/dustin-glitch/formularLogging
  * Description: End-to-end logging for form submissions and mail delivery into daily CSV files.
- * Version: 1.3.1
+ * Version: 1.3.2
  * Author: Dustin
  * License: GPLv2 or later
  * Text Domain: formular-logging
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('FL_FORMULAR_LOGGING_VERSION')) {
-    define('FL_FORMULAR_LOGGING_VERSION', '1.3.1');
+    define('FL_FORMULAR_LOGGING_VERSION', '1.3.2');
 }
 
 if (!defined('FL_FORMULAR_LOGGING_PLUGIN_FILE')) {

@@ -16,6 +16,87 @@ Unterstützt: YOOtheme Pro, YOOessentials, WP Mail SMTP und alle Standard-WordPr
 
 ---
 
+## Setup Guide
+
+### 1. Plugin installieren
+
+Ordner `formular-logging` nach `wp-content/plugins/` kopieren und im WordPress-Backend aktivieren.
+
+### 2. Formularseiten eintragen
+
+**Formular Logs → Einstellungen → Formularseiten**
+
+Eine URL oder ein Pfad pro Zeile. Nur auf diesen Seiten werden die Logger-Skripte geladen.
+
+```
+/kontakt
+/angebot
+https://example.com/bewerbung
+```
+
+Tipp: Pfade ohne Domain funktionieren auch und sind portabler.
+
+### 3. Nginx: Log-Verzeichnis absichern
+
+Auf Apache wird `.htaccess` automatisch angelegt. Auf **Nginx** muss das manuell in die Server-Konfiguration:
+
+```nginx
+location ^~ /wp-content/uploads/form-logs/ {
+    deny all;
+    return 403;
+}
+```
+
+Alternativ unter Einstellungen einen **absoluten Pfad außerhalb des Webroots** konfigurieren — das ist die sicherere Variante:
+
+```
+/var/www/logs/form-logs
+```
+
+### 4. GitHub-Token hinterlegen (automatische Updates)
+
+In `wp-config.php` definieren statt in der Admin-UI:
+
+```php
+define('FL_GITHUB_UPDATE_TOKEN', 'ghp_...');
+```
+
+Das Token wird dann nicht in der Datenbank gespeichert. Benötigt werden mindestens `repo` (Read-only) Berechtigungen.
+
+### 5. YOOtheme Pro + YOOessentials (ZOOlanders)
+
+Kein zusätzlicher Konfigurationsschritt nötig. Das Plugin hängt sich automatisch in den YOOtheme Event-Stack ein (`form.submission` Middleware) und loggt:
+
+- **Server-seitig:** Formulardaten, Aktionsstatus (Erfolg/Fehler) und Meta-Daten über den YOOtheme Event-Hook
+- **Frontend:** Submit-Start, Erfolg, Validierungs- und Submission-Fehler über UIkit-Events (`yooessentials-form:submit`, `yooessentials-form:submitted` etc.)
+
+Beide Einträge werden über die **Request-ID** zusammengeführt, die das Frontend als verstecktes Feld (`fl_request_id`) in das Formular injiziert.
+
+### 6. WP Mail SMTP
+
+Wird automatisch erkannt. Die Hooks `wp_mail_smtp_mailcatcher_send_failed` werden zusätzlich zu den Standard-WordPress-Mail-Hooks registriert. Kein Konfigurationsschritt nötig.
+
+### 7. Fehler-Benachrichtigungen (optional)
+
+**Formular Logs → Einstellungen → Fehler-Benachrichtigungen**
+
+- E-Mail-Empfänger: eine Adresse pro Zeile
+- Slack: Incoming Webhook URL des Ziel-Kanals
+- Cooldown sinnvoll auf ≥15 Min. lassen um Benachrichtigungs-Spam zu vermeiden
+
+Validierungs- und Captcha-Fehler lösen **keinen** Alert aus.
+
+### 8. Rate Limiting (optional)
+
+**Formular Logs → Einstellungen → Rate Limiting**
+
+Empfehlung für Produktivsysteme:
+- Schwellenwert: 20 Fehler in 5 Min.
+- Aktion: Temporär (60 Min.)
+- Permanent nur bei bekannten Angriffs-IPs
+
+---
+
 ## Installation
 
 1. Ordner `formular-logging` nach `wp-content/plugins/` kopieren
